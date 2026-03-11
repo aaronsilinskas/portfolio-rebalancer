@@ -17,13 +17,14 @@ import click
 from rebalancer.config import load_config, load_positions
 from rebalancer.data import fetch_latest_prices, fetch_prices
 from rebalancer.portfolio import Portfolio
-from rebalancer.rebalancer import compute_trades
-from rebalancer.report import write_csv, write_html_report
+from rebalancer.rebalancer import compute_trades, project_shares_after_trades
+from rebalancer.report import write_csv, write_daily_check_files, write_html_report
 from rebalancer.simulator import is_second_wednesday, run_simulation
 
 
 DEFAULT_CONFIG = Path(__file__).parent.parent.parent / "config" / "portfolio.yaml"
 DEFAULT_POSITIONS = Path(__file__).parent.parent.parent / "config" / "positions.yaml"
+DEFAULT_DAILY_OUTPUT = Path("output") / "daily"
 
 
 @click.command()
@@ -92,7 +93,14 @@ def simulate(config: Path, start, end, cash: float, output: Path) -> None:
     show_default=True,
     help="Path to current positions YAML file.",
 )
-def daily_check(config: Path, positions: Path) -> None:
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_DAILY_OUTPUT,
+    show_default=True,
+    help="Directory to write dated daily-check output files.",
+)
+def daily_check(config: Path, positions: Path, output: Path) -> None:
     """
     Run the daily drift and schedule check.
 
@@ -108,10 +116,21 @@ def daily_check(config: Path, positions: Path) -> None:
 
     shares_by_ticker = load_positions(positions, allowed_tickers=set(cfg.tickers()))
     portfolio = Portfolio.from_shares(cfg, shares_by_ticker, prices)
+    current_positions = portfolio.share_counts()
     if portfolio.total_value <= 0:
-        raise click.ClickException(
-            "Positions file must contain a positive total market value before daily checks can run."
+        output_path = write_daily_check_files(
+            as_of=today,
+            portfolio=portfolio,
+            drifts=None,
+            trades=[],
+            reasons=["positions file contains zero market value; update shares when holdings are established"],
+            status="skipped_no_positions",
+            output_dir=output,
+            current_positions=current_positions,
         )
+        click.echo("Positions file has zero market value. Daily check skipped until holdings are set.")
+        click.echo(f"Daily output written to {output_path}/")
+        return
 
     scheduled = is_second_wednesday(today)
     drifts = portfolio.drifts()
@@ -120,7 +139,18 @@ def daily_check(config: Path, positions: Path) -> None:
     drift_breach = bool(breaches)
 
     if not scheduled and not drift_breach:
+        output_path = write_daily_check_files(
+            as_of=today,
+            portfolio=portfolio,
+            drifts=drifts,
+            trades=[],
+            reasons=["no rebalance trigger detected"],
+            status="no_action",
+            output_dir=output,
+            current_positions=current_positions,
+        )
         click.echo("No rebalancing needed today.")
+        click.echo(f"Daily output written to {output_path}/")
         return
 
     reason = []
@@ -129,10 +159,39 @@ def daily_check(config: Path, positions: Path) -> None:
     if drift_breach:
         reason.append(f"drift breach: {breaches}")
 
-    click.echo(f"Rebalance triggered: {', '.join(reason)}")
     trades = compute_trades(portfolio)
+    if not trades:
+        output_path = write_daily_check_files(
+            as_of=today,
+            portfolio=portfolio,
+            drifts=drifts,
+            trades=[],
+            reasons=reason + ["portfolio is already at target weights"],
+            status="no_action",
+            output_dir=output,
+            current_positions=current_positions,
+        )
+        click.echo("Rebalance trigger detected, but the portfolio is already at target weights.")
+        click.echo(f"Daily output written to {output_path}/")
+        return
+
+    projected_positions = project_shares_after_trades(current_positions, trades)
+    output_path = write_daily_check_files(
+        as_of=today,
+        portfolio=portfolio,
+        drifts=drifts,
+        trades=trades,
+        reasons=reason,
+        status="action_required",
+        output_dir=output,
+        current_positions=current_positions,
+        projected_positions=projected_positions,
+    )
+
+    click.echo(f"Rebalance triggered: {', '.join(reason)}")
     click.echo("\nRequired trades:")
     for trade in trades:
         click.echo(
             f"  {trade.action:4s} {trade.shares:.4f} shares of {trade.ticker} @ ${trade.price:.2f}  (${trade.value:,.2f})"
         )
+    click.echo(f"Daily output written to {output_path}/")

@@ -35,6 +35,10 @@ class Portfolio:
             return {ticker: 0.0 for ticker in self.holdings}
         return {ticker: h.market_value / total for ticker, h in self.holdings.items()}
 
+    def share_counts(self) -> dict[str, float]:
+        """Return current share counts keyed by ticker."""
+        return {ticker: holding.shares for ticker, holding in self.holdings.items()}
+
     def drifts(self) -> dict[str, float]:
         """
         Return the drift of each holding from its target weight.

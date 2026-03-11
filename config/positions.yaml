@@ -1,5 +1,7 @@
 # Current portfolio positions used by the daily check command.
 # Replace these placeholder share counts with your actual holdings.
+# Until you have real positions, leaving these at 0.0 is fine; the daily command
+# will skip rebalancing and write a summary file instead of failing.
 
 positions:
   - ticker: SPY

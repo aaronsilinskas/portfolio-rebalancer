@@ -61,3 +61,18 @@ def apply_trades(portfolio: Portfolio, trades: list[Trade]) -> None:
             holding.shares += trade.shares
         else:
             holding.shares -= trade.shares
+
+
+def project_shares_after_trades(
+    shares_by_ticker: dict[str, float],
+    trades: list[Trade],
+) -> dict[str, float]:
+    """Return projected share counts after applying the proposed trades."""
+    projected = shares_by_ticker.copy()
+    for trade in trades:
+        signed_shares = trade.shares if trade.action == "BUY" else -trade.shares
+        next_shares = projected.get(trade.ticker, 0.0) + signed_shares
+        if next_shares < -1e-9:
+            raise ValueError(f"Trade would result in a negative share count for {trade.ticker}")
+        projected[trade.ticker] = 0.0 if abs(next_shares) < 1e-9 else next_shares
+    return projected

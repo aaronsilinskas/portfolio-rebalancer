@@ -30,6 +30,7 @@ This project will automatically rebalance funds across a set of stock indexes, w
 - **Price data:** Yahoo Finance (via `yfinance`)
 - **Live trading:** manual execution — the system generates trade instructions but does not place orders automatically until confidence is high enough to automate via broker API
 - **Daily checks:** use a local positions file with current fractional share counts so drift is measured against actual holdings, not a synthetic portfolio
+- **Manual workflow:** the daily command writes dated output files with a summary, current holdings snapshot, trade instructions, and a projected `positions_after.yaml` file when rebalancing is needed
 
 ## Backtesting / Simulation
 
@@ -50,3 +51,11 @@ Key parameters that should be configurable per portfolio:
 - Drift threshold mode: `absolute` (percentage points) or `relative` (percentage of target weight)
 - Rebalance schedule (default: 2nd Wednesday monthly)
 - Minimum days between rebalance events (default: 7)
+
+## Manual Daily Workflow
+
+1. Keep [config/positions.yaml](/Users/AaronH/dev/finance/rebalancer/config/positions.yaml) updated manually as you establish positions.
+2. Run `uv run rebalancer-daily`.
+3. Review the dated folder under `output/daily/YYYY-MM-DD/`.
+4. If trades are required, execute them manually and then update `config/positions.yaml` to match the projected `positions_after.yaml` output.
+5. If positions are still zero while you are designing the portfolio, the daily command will skip rebalancing cleanly and still write a summary file.

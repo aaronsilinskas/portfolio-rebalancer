@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rebalancer.config import load_config, load_positions
+from rebalancer.config import dump_positions, load_config, load_positions
 
 
 def test_load_config_rejects_invalid_drift_mode(tmp_path: Path):
@@ -71,3 +71,12 @@ positions:
 
     with pytest.raises(ValueError, match="Ticker TLT is not defined"):
         load_positions(positions_path, allowed_tickers={"SPY", "BND"})
+
+
+def test_dump_positions_round_trips(tmp_path: Path):
+    positions_path = tmp_path / "positions.yaml"
+    positions = {"SPY": 12.5, "BND": 7.25}
+
+    dump_positions(positions_path, positions)
+
+    assert load_positions(positions_path) == positions

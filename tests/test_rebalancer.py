@@ -2,7 +2,7 @@
 Tests for rebalancing trade computation.
 """
 
-from rebalancer.rebalancer import apply_trades, compute_trades
+from rebalancer.rebalancer import apply_trades, compute_trades, project_shares_after_trades
 from tests.helpers import make_portfolio
 
 
@@ -35,3 +35,15 @@ def test_no_trades_when_on_target():
     portfolio = make_portfolio(spy_price=100.0, bnd_price=100.0)
     trades = compute_trades(portfolio)
     assert trades == []
+
+
+def test_project_shares_after_trades_matches_expected_targets():
+    portfolio = make_portfolio(
+        spy_price=100.0, bnd_price=100.0, spy_shares=75.0, bnd_shares=25.0
+    )
+    trades = compute_trades(portfolio)
+
+    projected = project_shares_after_trades(portfolio.share_counts(), trades)
+
+    assert projected["SPY"] == 60.0
+    assert projected["BND"] == 40.0

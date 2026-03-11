@@ -162,3 +162,16 @@ def load_positions(
         positions[ticker] = shares
 
     return positions
+
+
+def dump_positions(path: Path | str, positions: dict[str, float]) -> None:
+    """Write portfolio share counts to a YAML file."""
+    payload = {
+        "positions": [
+            {"ticker": ticker, "shares": round(float(shares), 6)}
+            for ticker, shares in positions.items()
+        ]
+    }
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(yaml.safe_dump(payload, sort_keys=False))

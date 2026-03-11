@@ -4,16 +4,29 @@ report.py — Generate CSV and HTML (with Plotly charts) output from simulation 
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from rebalancer.config import dump_positions
+from rebalancer.portfolio import Portfolio
+from rebalancer.rebalancer import Trade
 from rebalancer.simulator import DailySnapshot
 
 
 TRADE_COLUMNS = ["date", "ticker", "action", "shares", "price", "value"]
+HOLDING_COLUMNS = [
+    "ticker",
+    "shares",
+    "price",
+    "market_value",
+    "current_weight",
+    "target_weight",
+    "drift",
+]
 
 
 def build_snapshots_df(snapshots: list[DailySnapshot]) -> pd.DataFrame:
@@ -42,6 +55,86 @@ def build_trades_df(snapshots: list[DailySnapshot]) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows, columns=TRADE_COLUMNS)
+
+
+def build_trade_list_df(trades: list[Trade], as_of: date) -> pd.DataFrame:
+    """Convert a list of proposed trades into a flat DataFrame."""
+    rows = [
+        {
+            "date": as_of,
+            "ticker": trade.ticker,
+            "action": trade.action,
+            "shares": round(trade.shares, 6),
+            "price": round(trade.price, 4),
+            "value": round(trade.value, 2),
+        }
+        for trade in trades
+    ]
+    return pd.DataFrame(rows, columns=TRADE_COLUMNS)
+
+
+def build_holdings_df(
+    portfolio: Portfolio,
+    *,
+    drifts: dict[str, float] | None = None,
+) -> pd.DataFrame:
+    """Convert the current portfolio into a flat holdings DataFrame."""
+    current_weights = portfolio.current_weights()
+    target_weights = portfolio.config.target_weights()
+
+    rows = []
+    for ticker, holding in portfolio.holdings.items():
+        rows.append(
+            {
+                "ticker": ticker,
+                "shares": round(holding.shares, 6),
+                "price": round(holding.price, 4),
+                "market_value": round(holding.market_value, 2),
+                "current_weight": round(current_weights.get(ticker, 0.0), 6),
+                "target_weight": round(target_weights[ticker], 6),
+                "drift": None if drifts is None else round(drifts.get(ticker, 0.0), 6),
+            }
+        )
+
+    return pd.DataFrame(rows, columns=HOLDING_COLUMNS)
+
+
+def write_daily_check_files(
+    *,
+    as_of: date,
+    portfolio: Portfolio,
+    drifts: dict[str, float] | None,
+    trades: list[Trade],
+    reasons: list[str],
+    status: str,
+    output_dir: Path,
+    current_positions: dict[str, float],
+    projected_positions: dict[str, float] | None = None,
+) -> Path:
+    """Write dated daily-check outputs for manual review and position updates."""
+    day_dir = output_dir / as_of.isoformat()
+    day_dir.mkdir(parents=True, exist_ok=True)
+
+    summary_lines = [
+        "Daily Rebalance Check",
+        f"Date: {as_of.isoformat()}",
+        f"Status: {status}",
+        f"Total market value: ${portfolio.total_value:,.2f}",
+        f"Trade count: {len(trades)}",
+        "Reasons:",
+    ]
+    summary_lines.extend(f"- {reason}" for reason in reasons or ["none"])
+    if projected_positions is not None:
+        summary_lines.append("Projected post-trade positions: positions_after.yaml")
+
+    (day_dir / "summary.txt").write_text("\n".join(summary_lines) + "\n")
+    build_holdings_df(portfolio, drifts=drifts).to_csv(day_dir / "holdings.csv", index=False)
+    build_trade_list_df(trades, as_of).to_csv(day_dir / "trades.csv", index=False)
+    dump_positions(day_dir / "positions_current.yaml", current_positions)
+    if projected_positions is not None:
+        dump_positions(day_dir / "positions_after.yaml", projected_positions)
+
+    return day_dir
 
 
 def write_csv(snapshots: list[DailySnapshot], output_dir: Path) -> None:
