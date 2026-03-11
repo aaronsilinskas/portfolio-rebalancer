@@ -16,6 +16,7 @@ dependencies = [
 rebalancer-simulate = "rebalancer.cli:simulate"
 rebalancer-daily = "rebalancer.cli:daily_check"
 rebalancer-sync-positions = "rebalancer.cli:sync_positions"
+rebalancer-compare = "rebalancer.cli:compare_tickers"
 
 [build-system]
 requires = ["hatchling"]

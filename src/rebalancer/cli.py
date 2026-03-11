@@ -14,6 +14,7 @@ from pathlib import Path
 
 import click
 
+from rebalancer.compare import write_comparison_outputs
 from rebalancer.config import dump_positions, load_config, load_positions
 from rebalancer.data import fetch_latest_prices, fetch_prices
 from rebalancer.portfolio import Portfolio
@@ -25,6 +26,7 @@ from rebalancer.simulator import is_second_wednesday, run_simulation
 DEFAULT_CONFIG = Path(__file__).parent.parent.parent / "config" / "portfolio.yaml"
 DEFAULT_POSITIONS = Path(__file__).parent.parent.parent / "config" / "positions.yaml"
 DEFAULT_DAILY_OUTPUT = Path("output") / "daily"
+DEFAULT_COMPARE_OUTPUT = Path("output") / "comparisons"
 
 
 @click.command()
@@ -123,12 +125,16 @@ def daily_check(config: Path, positions: Path, output: Path) -> None:
             portfolio=portfolio,
             drifts=None,
             trades=[],
-            reasons=["positions file contains zero market value; update shares when holdings are established"],
+            reasons=[
+                "positions file contains zero market value; update shares when holdings are established"
+            ],
             status="skipped_no_positions",
             output_dir=output,
             current_positions=current_positions,
         )
-        click.echo("Positions file has zero market value. Daily check skipped until holdings are set.")
+        click.echo(
+            "Positions file has zero market value. Daily check skipped until holdings are set."
+        )
         click.echo(f"Daily output written to {output_path}/")
         return
 
@@ -171,7 +177,9 @@ def daily_check(config: Path, positions: Path, output: Path) -> None:
             output_dir=output,
             current_positions=current_positions,
         )
-        click.echo("Rebalance trigger detected, but the portfolio is already at target weights.")
+        click.echo(
+            "Rebalance trigger detected, but the portfolio is already at target weights."
+        )
         click.echo(f"Daily output written to {output_path}/")
         return
 
@@ -251,3 +259,70 @@ def sync_positions(config: Path, positions: Path, default_shares: float) -> None
         click.echo(f"Added missing tickers: {', '.join(added)}")
     if dropped:
         click.echo(f"Dropped tickers not in config: {', '.join(dropped)}")
+
+
+@click.command()
+@click.option(
+    "--category",
+    required=True,
+    type=str,
+    help="Category label for this comparison set (for display and output naming).",
+)
+@click.option(
+    "--ticker",
+    "tickers",
+    multiple=True,
+    required=True,
+    help="Ticker to include in comparison. Pass this option multiple times.",
+)
+@click.option(
+    "--start",
+    required=True,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Comparison start date (YYYY-MM-DD).",
+)
+@click.option(
+    "--end",
+    required=True,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Comparison end date (YYYY-MM-DD).",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_COMPARE_OUTPUT,
+    show_default=True,
+    help="Directory to write comparison output files.",
+)
+def compare_tickers(
+    category: str,
+    tickers: tuple[str, ...],
+    start,
+    end,
+    output: Path,
+) -> None:
+    """Compare a set of tickers over a date range."""
+    unique_tickers = list(dict.fromkeys(t.upper() for t in tickers))
+    if len(unique_tickers) < 2:
+        raise click.ClickException("At least two unique tickers are required.")
+
+    start_date = start.date()
+    end_date = end.date()
+    click.echo(
+        f"Comparing {len(unique_tickers)} tickers in '{category}' from {start_date} to {end_date} ..."
+    )
+
+    prices = fetch_prices(unique_tickers, start=start_date, end=end_date)
+    result = write_comparison_outputs(
+        category=category,
+        start=start_date.isoformat(),
+        end=end_date.isoformat(),
+        prices=prices,
+        output_root=output,
+    )
+
+    click.echo("Comparison complete. Output files:")
+    click.echo(f"  Summary CSV: {result.summary_csv}")
+    click.echo(f"  Prices CSV: {result.prices_csv}")
+    click.echo(f"  Normalized CSV: {result.normalized_csv}")
+    click.echo(f"  HTML report: {result.html_report}")

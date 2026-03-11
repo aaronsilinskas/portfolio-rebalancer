@@ -1,9 +1,10 @@
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 from click.testing import CliRunner
 
-from rebalancer.cli import daily_check, sync_positions
+from rebalancer.cli import compare_tickers, daily_check, sync_positions
 from rebalancer.config import load_positions
 
 
@@ -193,3 +194,64 @@ def test_sync_positions_can_bootstrap_new_file_with_default_shares(tmp_path: Pat
 
     assert result.exit_code == 0
     assert synced == {"SPY": 1.25, "BND": 1.25}
+
+
+def test_compare_tickers_requires_two_unique_tickers():
+    result = CliRunner().invoke(
+        compare_tickers,
+        [
+            "--category",
+            "US Large Cap",
+            "--ticker",
+            "SPY",
+            "--start",
+            "2024-01-01",
+            "--end",
+            "2024-01-31",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "At least two unique tickers are required" in result.output
+
+
+def test_compare_tickers_writes_outputs(tmp_path: Path, monkeypatch):
+    output_dir = tmp_path / "compare-output"
+
+    prices = pd.DataFrame(
+        {
+            "SPY": [100.0, 102.0, 101.0],
+            "VOO": [100.0, 101.0, 103.0],
+        },
+        index=pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
+    )
+
+    monkeypatch.setattr(
+        "rebalancer.cli.fetch_prices", lambda tickers, start, end: prices
+    )
+
+    result = CliRunner().invoke(
+        compare_tickers,
+        [
+            "--category",
+            "US Large Cap",
+            "--ticker",
+            "SPY",
+            "--ticker",
+            "VOO",
+            "--start",
+            "2024-01-01",
+            "--end",
+            "2024-01-03",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    expected_dir = output_dir / "us-large-cap-2024-01-01-to-2024-01-03"
+    assert result.exit_code == 0
+    assert "Comparison complete. Output files:" in result.output
+    assert (expected_dir / "summary.csv").exists()
+    assert (expected_dir / "prices.csv").exists()
+    assert (expected_dir / "normalized_prices.csv").exists()
+    assert (expected_dir / "comparison.html").exists()

@@ -60,3 +60,26 @@ Key parameters that should be configurable per portfolio:
 4. Review the dated folder under `output/daily/YYYY-MM-DD/`.
 5. If trades are required, execute them manually and then update `config/positions.yaml` to match the projected `positions_after.yaml` output.
 6. If positions are still zero while you are designing the portfolio, the daily command will skip rebalancing cleanly and still write a summary file.
+
+## Ticker Comparison
+
+Use the comparison command to evaluate multiple candidate tickers in the same category over a date range.
+
+Example:
+
+```bash
+uv run rebalancer-compare \
+  --category "US Large-Cap Equities" \
+  --ticker SPY \
+  --ticker VOO \
+  --ticker IVV \
+  --start 2024-01-01 \
+  --end 2024-12-31
+```
+
+Outputs are written under `output/comparisons/<category>-<start>-to-<end>/`:
+
+- `summary.csv` with return and risk metrics per ticker
+- `prices.csv` with raw adjusted close prices
+- `normalized_prices.csv` with each series normalized to 100 at its first date
+- `comparison.html` with an interactive normalized performance chart
