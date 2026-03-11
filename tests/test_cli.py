@@ -91,11 +91,11 @@ def test_daily_check_skips_cleanly_when_positions_are_empty(
     _write_positions(positions_path, spy_shares=0.0, bnd_shares=0.0)
 
     monkeypatch.setattr(
-        "rebalancer.cli.fetch_latest_prices",
+        "rebalancer.cli_rebalance.fetch_latest_prices",
         lambda tickers: {"SPY": 100.0, "BND": 100.0},
     )
-    monkeypatch.setattr("rebalancer.cli.is_second_wednesday", lambda _: False)
-    monkeypatch.setattr("rebalancer.cli.date", FixedDate)
+    monkeypatch.setattr("rebalancer.cli_rebalance.is_second_wednesday", lambda _: False)
+    monkeypatch.setattr("rebalancer.cli_rebalance.date", FixedDate)
 
     result = CliRunner().invoke(
         daily_check,
@@ -125,11 +125,11 @@ def test_daily_check_writes_projected_positions_when_action_is_required(
     _write_positions(positions_path, spy_shares=75.0, bnd_shares=25.0)
 
     monkeypatch.setattr(
-        "rebalancer.cli.fetch_latest_prices",
+        "rebalancer.cli_rebalance.fetch_latest_prices",
         lambda tickers: {"SPY": 100.0, "BND": 100.0},
     )
-    monkeypatch.setattr("rebalancer.cli.is_second_wednesday", lambda _: False)
-    monkeypatch.setattr("rebalancer.cli.date", FixedDate)
+    monkeypatch.setattr("rebalancer.cli_rebalance.is_second_wednesday", lambda _: False)
+    monkeypatch.setattr("rebalancer.cli_rebalance.date", FixedDate)
 
     result = CliRunner().invoke(
         daily_check,
@@ -234,7 +234,7 @@ def test_compare_tickers_writes_outputs(tmp_path: Path, monkeypatch):
     )
 
     monkeypatch.setattr(
-        "rebalancer.cli.fetch_prices", lambda tickers, start, end: prices
+        "rebalancer.cli_simulator.fetch_prices", lambda tickers, start, end: prices
     )
 
     result = CliRunner().invoke(
@@ -273,10 +273,10 @@ def test_ramp_plan_writes_output_for_selected_stage(tmp_path: Path, monkeypatch)
     _write_positions(positions_path, spy_shares=50.0, bnd_shares=50.0)
 
     monkeypatch.setattr(
-        "rebalancer.cli.fetch_latest_prices",
+        "rebalancer.cli_ramp.fetch_latest_prices",
         lambda tickers: {"SPY": 100.0, "BND": 100.0},
     )
-    monkeypatch.setattr("rebalancer.cli.date", FixedDate)
+    monkeypatch.setattr("rebalancer.cli_ramp.date", FixedDate)
 
     result = CliRunner().invoke(
         ramp_plan,
@@ -310,10 +310,10 @@ def test_ramp_plan_inferrs_stage_from_funded_ratio(tmp_path: Path, monkeypatch):
     _write_positions(positions_path, spy_shares=50.0, bnd_shares=50.0)
 
     monkeypatch.setattr(
-        "rebalancer.cli.fetch_latest_prices",
+        "rebalancer.cli_ramp.fetch_latest_prices",
         lambda tickers: {"SPY": 100.0, "BND": 100.0},
     )
-    monkeypatch.setattr("rebalancer.cli.date", FixedDate)
+    monkeypatch.setattr("rebalancer.cli_ramp.date", FixedDate)
 
     result = CliRunner().invoke(
         ramp_plan,
@@ -380,7 +380,9 @@ def test_ramp_backtest_writes_progression_positions_and_summary(
         },
         index=pd.to_datetime(["2026-01-02", "2026-02-03", "2026-03-10"]),
     )
-    monkeypatch.setattr("rebalancer.cli.fetch_prices", lambda *args, **kwargs: prices)
+    monkeypatch.setattr(
+        "rebalancer.cli_ramp.fetch_prices", lambda *args, **kwargs: prices
+    )
 
     result = CliRunner().invoke(
         ramp_backtest,
