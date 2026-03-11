@@ -14,7 +14,7 @@ from rebalancer.cli_options import (
     with_positions_option,
 )
 from rebalancer.config import load_config
-from rebalancer.data import fetch_latest_prices
+from rebalancer.market_data import fetch_latest_prices
 from rebalancer.services.rebalance import run_daily_check, sync_positions_file
 from rebalancer.simulator import is_second_wednesday
 

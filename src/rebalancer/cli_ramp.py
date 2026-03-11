@@ -13,7 +13,7 @@ from rebalancer.cli_options import (
     with_output_option,
     with_positions_option,
 )
-from rebalancer.data import fetch_latest_prices, fetch_prices
+from rebalancer.market_data import fetch_latest_prices, fetch_prices
 from rebalancer.services.ramp import (
     create_ramp_backtest,
     create_ramp_plan,

@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from rebalancer.data import fetch_prices
+from rebalancer.market_data import fetch_prices
 
 
 def test_fetch_prices_uses_inclusive_end_date(monkeypatch: pytest.MonkeyPatch):
@@ -16,7 +16,7 @@ def test_fetch_prices_uses_inclusive_end_date(monkeypatch: pytest.MonkeyPatch):
             index=pd.to_datetime(["2024-01-30", "2024-01-31"]),
         )
 
-    monkeypatch.setattr("rebalancer.data.yf.download", fake_download)
+    monkeypatch.setattr("rebalancer.market_data.yf.download", fake_download)
 
     prices = fetch_prices(["SPY"], start=date(2024, 1, 1), end=date(2024, 1, 31))
 

@@ -1,5 +1,5 @@
 """
-data.py — Fetch historical and current price data from Yahoo Finance via yfinance.
+market_data.py — Fetch historical and current price data from Yahoo Finance via yfinance.
 """
 
 from __future__ import annotations

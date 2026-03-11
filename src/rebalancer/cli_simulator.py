@@ -14,7 +14,7 @@ from rebalancer.cli_options import (
     with_start_date_option,
 )
 from rebalancer.config import load_config
-from rebalancer.data import fetch_prices
+from rebalancer.market_data import fetch_prices
 from rebalancer.services.simulator import (
     run_historical_simulation,
     run_ticker_comparison,
