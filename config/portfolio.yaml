@@ -6,34 +6,34 @@ portfolio:
   name: "Default 10-Index Portfolio"
 
   holdings:
-    - ticker: SPY
+    - ticker: VOO # IVV, SPY, VTI considered.
       label: "US Large-Cap Equities"
       target_weight: 0.10
-    - ticker: VB
+    - ticker: VO # AVUV, IJH, IJR, VB considered. AVUV too volatile.
       label: "US Small/Mid-Cap Equities"
       target_weight: 0.10
-    - ticker: VEA
+    - ticker: VEA # IEFA, SCHF considered.
       label: "Developed ex-US Equities"
       target_weight: 0.10
-    - ticker: VWO
+    - ticker: IEMG # VWO, SPEM considered.
       label: "Emerging Markets Equities"
       target_weight: 0.10
-    - ticker: VNQ
+    - ticker: REET # SCHH, USRT, VNQ considered.
       label: "Global Real Estate"
       target_weight: 0.10
-    - ticker: GLD
+    - ticker: GLD # IAU, SGOL, GDX, GDXJ, RING, SGDM considered. If gold plummets, look at switch to GDX
       label: "Precious Metals/Gold"
       target_weight: 0.10
-    - ticker: DBC
+    - ticker: BCI # COM, DBC, PDBC considered.
       label: "Broad Commodities"
       target_weight: 0.10
-    - ticker: XLE
+    - ticker: IXC # VDE, XLE considered.
       label: "Energy/Resources"
       target_weight: 0.10
-    - ticker: BND
+    - ticker: VGIT # IEF more aggressive, keep watch. AGG, BND, SCHZ considered.
       label: "Bonds/Fixed Income"
       target_weight: 0.10
-    - ticker: BIL
+    - ticker: USFR # BIL, SGOV, SHV, TFLO considered.
       label: "Cash/Short-Term"
       target_weight: 0.10
 
