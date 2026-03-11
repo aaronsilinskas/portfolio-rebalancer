@@ -54,8 +54,9 @@ Key parameters that should be configurable per portfolio:
 
 ## Manual Daily Workflow
 
-1. Keep [config/positions.yaml](/Users/AaronH/dev/finance/rebalancer/config/positions.yaml) updated manually as you establish positions.
-2. Run `uv run rebalancer-daily`.
-3. Review the dated folder under `output/daily/YYYY-MM-DD/`.
-4. If trades are required, execute them manually and then update `config/positions.yaml` to match the projected `positions_after.yaml` output.
-5. If positions are still zero while you are designing the portfolio, the daily command will skip rebalancing cleanly and still write a summary file.
+1. After any ticker changes, run `uv run rebalancer-sync-positions` to align `config/positions.yaml` with your portfolio config while preserving existing shares.
+2. Keep [config/positions.yaml](/Users/AaronH/dev/finance/rebalancer/config/positions.yaml) updated manually as you establish positions.
+3. Run `uv run rebalancer-daily`.
+4. Review the dated folder under `output/daily/YYYY-MM-DD/`.
+5. If trades are required, execute them manually and then update `config/positions.yaml` to match the projected `positions_after.yaml` output.
+6. If positions are still zero while you are designing the portfolio, the daily command will skip rebalancing cleanly and still write a summary file.

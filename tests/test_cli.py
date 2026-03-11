@@ -3,7 +3,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from rebalancer.cli import daily_check
+from rebalancer.cli import daily_check, sync_positions
 from rebalancer.config import load_positions
 
 
@@ -43,6 +43,31 @@ positions:
     shares: {spy_shares}
   - ticker: BND
     shares: {bnd_shares}
+""".strip()
+    )
+
+
+def _write_three_ticker_config(path: Path) -> None:
+    path.write_text(
+        """
+portfolio:
+  name: Test
+  holdings:
+    - ticker: SPY
+      label: US Large-Cap
+      target_weight: 0.4
+    - ticker: BND
+      label: Bonds
+      target_weight: 0.4
+    - ticker: GLD
+      label: Gold
+      target_weight: 0.2
+rebalance:
+  schedule: 2nd_wednesday
+  min_days_between_rebalances: 7
+  drift:
+    mode: absolute
+    threshold: 0.075
 """.strip()
     )
 
@@ -117,3 +142,54 @@ def test_daily_check_writes_projected_positions_when_action_is_required(
     assert result.exit_code == 0
     assert "Required trades:" in result.output
     assert projected_positions == {"SPY": 60.0, "BND": 40.0}
+
+
+def test_sync_positions_preserves_known_adds_missing_and_drops_unknown(tmp_path: Path):
+    config_path = tmp_path / "portfolio.yaml"
+    positions_path = tmp_path / "positions.yaml"
+
+    _write_three_ticker_config(config_path)
+    positions_path.write_text(
+        """
+positions:
+  - ticker: SPY
+    shares: 10
+  - ticker: TLT
+    shares: 5
+""".strip()
+    )
+
+    result = CliRunner().invoke(
+        sync_positions,
+        ["--config", str(config_path), "--positions", str(positions_path)],
+    )
+
+    synced = load_positions(positions_path)
+
+    assert result.exit_code == 0
+    assert synced == {"SPY": 10.0, "BND": 0.0, "GLD": 0.0}
+    assert "Dropped tickers not in config: TLT" in result.output
+
+
+def test_sync_positions_can_bootstrap_new_file_with_default_shares(tmp_path: Path):
+    config_path = tmp_path / "portfolio.yaml"
+    positions_path = tmp_path / "positions.yaml"
+
+    _write_config(config_path)
+
+    result = CliRunner().invoke(
+        sync_positions,
+        [
+            "--config",
+            str(config_path),
+            "--positions",
+            str(positions_path),
+            "--default-shares",
+            "1.25",
+        ],
+    )
+
+    synced = load_positions(positions_path)
+
+    assert result.exit_code == 0
+    assert synced == {"SPY": 1.25, "BND": 1.25}
