@@ -210,6 +210,20 @@ def test_run_historical_simulation_returns_summary_and_writes_files(tmp_path: Pa
         },
         index=pd.to_datetime(["2024-01-02", "2024-01-03"]),
     )
+    benchmark_prices = pd.DataFrame(
+        {
+            "^GSPC": [4800.0, 4810.0],
+            "^IXIC": [15000.0, 15050.0],
+        },
+        index=pd.to_datetime(["2024-01-02", "2024-01-03"]),
+    )
+
+    def fake_fetch_prices(tickers, start, end):
+        if tickers == ["SPY", "BND"]:
+            return prices
+        if tickers == ["^GSPC", "^IXIC"]:
+            return benchmark_prices
+        raise AssertionError(f"Unexpected ticker list: {tickers}")
 
     result = run_historical_simulation(
         config_path=config_path,
@@ -217,13 +231,17 @@ def test_run_historical_simulation_returns_summary_and_writes_files(tmp_path: Pa
         end_date=date(2024, 1, 3),
         cash=10_000.0,
         output_dir=output_dir,
-        price_fetcher=lambda tickers, start, end: prices,
+        price_fetcher=fake_fetch_prices,
+        benchmark_tickers=("^GSPC", "^IXIC"),
+        benchmark_price_fetcher=fake_fetch_prices,
     )
 
     assert result.rebalance_count >= 0
     assert result.final_value > 0
+    assert result.benchmark_tickers == ["^GSPC", "^IXIC"]
     assert (output_dir / "snapshots.csv").exists()
     assert (output_dir / "trades.csv").exists()
+    assert (output_dir / "benchmark_values.csv").exists()
     assert (output_dir / "report.html").exists()
 
 

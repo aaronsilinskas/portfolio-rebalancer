@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -11,14 +12,24 @@ from rebalancer.report.frames import build_snapshots_df, build_trades_df
 from rebalancer.simulator import DailySnapshot
 
 
-def write_csv(snapshots: list[DailySnapshot], output_dir: Path) -> None:
+def write_csv(
+    snapshots: list[DailySnapshot],
+    output_dir: Path,
+    benchmark_values: pd.DataFrame | None = None,
+) -> None:
     """Write portfolio snapshots and trade log to CSV files."""
     output_dir.mkdir(parents=True, exist_ok=True)
     build_snapshots_df(snapshots).to_csv(output_dir / "snapshots.csv")
     build_trades_df(snapshots).to_csv(output_dir / "trades.csv", index=False)
+    if benchmark_values is not None and not benchmark_values.empty:
+        benchmark_values.to_csv(output_dir / "benchmark_values.csv")
 
 
-def write_html_report(snapshots: list[DailySnapshot], output_dir: Path) -> None:
+def write_html_report(
+    snapshots: list[DailySnapshot],
+    output_dir: Path,
+    benchmark_values: pd.DataFrame | None = None,
+) -> None:
     """Write a self-contained HTML report with interactive Plotly charts."""
     output_dir.mkdir(parents=True, exist_ok=True)
     snap_df = build_snapshots_df(snapshots)
@@ -42,6 +53,18 @@ def write_html_report(snapshots: list[DailySnapshot], output_dir: Path) -> None:
         row=1,
         col=1,
     )
+    if benchmark_values is not None and not benchmark_values.empty:
+        for ticker in benchmark_values.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=benchmark_values.index,
+                    y=benchmark_values[ticker],
+                    name=f"Benchmark {ticker}",
+                    line={"dash": "dash"},
+                ),
+                row=1,
+                col=1,
+            )
     for rebalance_date in rebalance_dates:
         fig.add_vline(
             x=str(rebalance_date),

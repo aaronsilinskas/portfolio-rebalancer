@@ -7,7 +7,7 @@ from click.testing import CliRunner
 from rebalancer.cli import main
 from rebalancer.cli_ramp import ramp_backtest, ramp_plan
 from rebalancer.cli_rebalance import daily_check, sync_positions
-from rebalancer.cli_simulator import compare_tickers
+from rebalancer.cli_simulator import compare_tickers, simulate
 from rebalancer.config import load_positions
 
 
@@ -258,6 +258,57 @@ def test_compare_tickers_writes_outputs(tmp_path: Path, monkeypatch):
     assert (expected_dir / "prices.csv").exists()
     assert (expected_dir / "normalized_prices.csv").exists()
     assert (expected_dir / "comparison.html").exists()
+
+
+def test_simulate_writes_benchmark_outputs(tmp_path: Path, monkeypatch):
+    config_path = tmp_path / "portfolio.yaml"
+    output_dir = tmp_path / "sim-output"
+
+    _write_config(config_path)
+
+    portfolio_prices = pd.DataFrame(
+        {
+            "SPY": [100.0, 101.0, 102.0],
+            "BND": [100.0, 100.5, 101.0],
+        },
+        index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
+    )
+    benchmark_prices = pd.DataFrame(
+        {
+            "^GSPC": [4800.0, 4815.0, 4820.0],
+            "^IXIC": [15000.0, 15120.0, 15180.0],
+        },
+        index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
+    )
+
+    def fake_fetch_prices(tickers, start, end):
+        if tickers == ["SPY", "BND"]:
+            return portfolio_prices
+        if tickers == ["^GSPC", "^IXIC"]:
+            return benchmark_prices
+        raise AssertionError(f"Unexpected ticker list: {tickers}")
+
+    monkeypatch.setattr("rebalancer.cli_simulator.fetch_prices", fake_fetch_prices)
+
+    result = CliRunner().invoke(
+        simulate,
+        [
+            "--config",
+            str(config_path),
+            "--start",
+            "2024-01-02",
+            "--end",
+            "2024-01-04",
+            "--cash",
+            "10000",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Including benchmarks:" in result.output
+    assert (output_dir / "benchmark_values.csv").exists()
 
 
 def test_ramp_plan_writes_output_for_selected_stage(tmp_path: Path, monkeypatch):

@@ -28,14 +28,43 @@ from rebalancer.services.simulator import (
 @click.option(
     "--cash", required=True, type=float, help="Starting portfolio value in USD."
 )
+@click.option(
+    "--benchmark",
+    "benchmarks",
+    multiple=True,
+    default=("^GSPC", "^IXIC"),
+    show_default=True,
+    help="Benchmark ticker to include in report (pass multiple times).",
+)
+@click.option(
+    "--no-benchmarks",
+    is_flag=True,
+    help="Disable benchmark overlays in simulation outputs.",
+)
 @with_output_option(
     default=Path("output"),
     help_text="Directory to write CSV and HTML report.",
 )
-def simulate(config: Path, start, end, cash: float, output: Path) -> None:
+def simulate(
+    config: Path,
+    start,
+    end,
+    cash: float,
+    benchmarks: tuple[str, ...],
+    no_benchmarks: bool,
+    output: Path,
+) -> None:
     """Run a backtest simulation over a historical date range."""
     cfg = load_config(config)
     click.echo(f"Fetching price data for {cfg.tickers()} ...")
+
+    selected_benchmarks: tuple[str, ...] = ()
+    if not no_benchmarks:
+        selected_benchmarks = tuple(
+            dict.fromkeys(ticker.upper() for ticker in benchmarks)
+        )
+        if selected_benchmarks:
+            click.echo(f"Including benchmarks: {list(selected_benchmarks)}")
 
     click.echo(
         f"Running simulation from {start.date()} to {end.date()} with ${cash:,.2f} ..."
@@ -51,6 +80,12 @@ def simulate(config: Path, start, end, cash: float, output: Path) -> None:
             start=start_date,
             end=end_date,
         ),
+        benchmark_tickers=selected_benchmarks,
+        benchmark_price_fetcher=lambda tickers, start_date, end_date: fetch_prices(
+            tickers,
+            start=start_date,
+            end=end_date,
+        ),
     )
 
     click.echo(
@@ -58,6 +93,8 @@ def simulate(config: Path, start, end, cash: float, output: Path) -> None:
     )
 
     click.echo(f"Results written to {output}/")
+    if result.benchmark_tickers:
+        click.echo(f"Benchmark CSV: {output}/benchmark_values.csv")
     click.echo(f"HTML report: {output}/report.html")
 
 

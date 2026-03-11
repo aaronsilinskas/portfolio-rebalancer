@@ -74,6 +74,8 @@ uv run rebalancer rebalance sync-positions
 
 After selecting tickers and target weights, validate behavior over time with a full simulation.
 
+By default, simulation also overlays S&P 500 (`^GSPC`) and NASDAQ (`^IXIC`) benchmarks over the same date range.
+
 ```bash
 uv run rebalancer simulator run \
   --start 2021-01-01 \
@@ -85,6 +87,7 @@ Review these outputs:
 
 - `output/snapshots.csv` for time-series portfolio state
 - `output/trades.csv` for rebalance trade events
+- `output/benchmark_values.csv` for benchmark value-series normalized to starting cash
 - `output/report.html` for cumulative portfolio behavior
 
 Use this phase to answer:
