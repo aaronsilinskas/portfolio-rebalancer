@@ -12,18 +12,18 @@ This project will automatically rebalance funds across a set of stock indexes, w
 - **Tax considerations:** standard taxable account — no wash-sale or tax-lot optimization is built in initially, but trades should be logged clearly for manual review
 - Balance across 10 configurable slots in a portfolio. Tickers and target weights are fully configurable. Default starting weights are 10% each. First-pass defaults:
 
-  | #   | Category                  | Default Ticker | Description                                       |
-  | --- | ------------------------- | -------------- | ------------------------------------------------- |
-  | 1   | US Large-Cap Equities     | SPY            | S&P 500 — core US market exposure                 |
-  | 2   | US Small/Mid-Cap Equities | VB             | Russell 2000 — smaller US firms for growth tilt   |
-  | 3   | Developed ex-US Equities  | VEA            | FTSE Developed Markets — Europe, Japan, etc.      |
-  | 4   | Emerging Markets Equities | VWO            | MSCI Emerging — China, India, Brazil growth       |
-  | 5   | Global Real Estate        | VNQ            | US/Global REITs — property/income diversification |
-  | 6   | Precious Metals/Gold      | GLD            | Gold — inflation hedge, low stock correlation     |
-  | 7   | Broad Commodities         | DBC            | Commodity Basket — energy, metals, agriculture    |
-  | 8   | Energy/Resources          | XLE            | Energy Select — oil/gas producers                 |
-  | 9   | Bonds/Fixed Income        | BND            | Total Bond — defensive ballast                    |
-  | 10  | Cash/Short-Term           | BIL            | T-Bills/Money Market — liquidity buffer           |
+  | #   | Category                  | Default Ticker | Description                                     |
+  | --- | ------------------------- | -------------- | ----------------------------------------------- |
+  | 1   | US Large-Cap Equities     | VOO            | S&P 500 — core US market exposure               |
+  | 2   | US Small/Mid-Cap Equities | VO             | US mid-cap equities — growth-oriented exposure  |
+  | 3   | Developed ex-US Equities  | VEA            | FTSE Developed Markets — Europe, Japan, etc.    |
+  | 4   | Emerging Markets Equities | IEMG           | Broad emerging markets equity exposure          |
+  | 5   | Global Real Estate        | REET           | Global REITs — property/income diversification  |
+  | 6   | Precious Metals/Gold      | GLD            | Gold — inflation hedge, low stock correlation   |
+  | 7   | Broad Commodities         | BCI            | Broad commodity exposure across key sectors     |
+  | 8   | Energy/Resources          | IXC            | Global energy producers and integrated majors   |
+  | 9   | Bonds/Fixed Income        | VGIT           | Intermediate US Treasuries — defensive ballast  |
+  | 10  | Cash/Short-Term           | USFR           | Floating-rate Treasury notes — liquidity buffer |
 
 ## Data & Execution
 
