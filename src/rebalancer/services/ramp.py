@@ -19,7 +19,7 @@ from rebalancer.ramp import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass
 class RampPlanResult:
     stage: str
     contribution: float
@@ -28,7 +28,7 @@ class RampPlanResult:
     plan: pd.DataFrame
 
 
-@dataclass(frozen=True)
+@dataclass
 class RampBacktestResult:
     output_dir: Path
     progression_path: Path

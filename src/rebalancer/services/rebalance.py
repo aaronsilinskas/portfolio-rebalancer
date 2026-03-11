@@ -13,7 +13,7 @@ from rebalancer.rebalancer import Trade, compute_trades, project_shares_after_tr
 from rebalancer.report import write_daily_check_files
 
 
-@dataclass(frozen=True)
+@dataclass
 class DailyCheckResult:
     status: str
     output_path: Path
@@ -21,7 +21,7 @@ class DailyCheckResult:
     trades: list[Trade]
 
 
-@dataclass(frozen=True)
+@dataclass
 class SyncPositionsResult:
     positions_path: Path
     added: list[str]

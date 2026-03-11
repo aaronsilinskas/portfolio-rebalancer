@@ -15,7 +15,7 @@ from rebalancer.report import write_csv, write_html_report
 from rebalancer.simulator import DailySnapshot, run_simulation
 
 
-@dataclass(frozen=True)
+@dataclass
 class SimulationRunResult:
     output_dir: Path
     rebalance_count: int
@@ -24,7 +24,7 @@ class SimulationRunResult:
     benchmark_tickers: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass
 class TickerComparisonResult:
     tickers: list[str]
     output: ComparisonOutput
