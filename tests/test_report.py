@@ -7,6 +7,7 @@ from rebalancer.report import (
     build_holdings_df,
     build_trades_df,
     write_daily_check_files,
+    write_html_report,
 )
 from rebalancer.simulator import DailySnapshot
 from tests.helpers import make_portfolio
@@ -57,3 +58,27 @@ def test_write_daily_check_files_creates_expected_outputs(tmp_path: Path):
     assert (day_dir / "holdings.csv").exists()
     assert (day_dir / "trades.csv").exists()
     assert (day_dir / "positions_current.yaml").exists()
+
+
+def test_write_html_report_includes_rebalance_event_marker(tmp_path: Path):
+    snapshots = [
+        DailySnapshot(
+            date=date(2024, 1, 9),
+            total_value=10_000.0,
+            weights={"SPY": 0.6, "BND": 0.4},
+            rebalanced=False,
+            trades=[],
+        ),
+        DailySnapshot(
+            date=date(2024, 1, 10),
+            total_value=10_100.0,
+            weights={"SPY": 0.59, "BND": 0.41},
+            rebalanced=True,
+            trades=[],
+        ),
+    ]
+
+    write_html_report(snapshots, tmp_path)
+
+    html = (tmp_path / "report.html").read_text()
+    assert "Rebalance Event" in html

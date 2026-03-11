@@ -65,14 +65,30 @@ def write_html_report(
                 row=1,
                 col=1,
             )
+    if len(rebalance_dates) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="lines",
+                name="Rebalance Event",
+                line={"color": "orange", "dash": "dot"},
+            ),
+            row=1,
+            col=1,
+        )
+
     for rebalance_date in rebalance_dates:
-        fig.add_vline(
-            x=str(rebalance_date),
-            line_width=1,
-            line_dash="dot",
-            line_color="orange",
-            row=1,  # type: ignore[call-arg]
-            col=1,  # type: ignore[call-arg]
+        fig.add_shape(
+            type="line",
+            x0=rebalance_date,
+            x1=rebalance_date,
+            y0=0,
+            y1=1,
+            xref="x",
+            yref="paper",
+            line={"color": "orange", "width": 1, "dash": "dot"},
+            layer="above",
         )
 
     weight_cols = [col for col in snap_df.columns if col.startswith("weight_")]
