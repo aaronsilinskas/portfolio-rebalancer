@@ -124,3 +124,43 @@ positions:
     positions = load_positions(positions_path, allowed_tickers={"SPY", "BND"})
 
     assert positions == {"SPY": 10.0, "BND": 5.0}
+
+
+def test_load_config_rejects_non_string_ticker(tmp_path: Path):
+    config_path = tmp_path / "portfolio.yaml"
+    config_path.write_text(
+        """
+portfolio:
+  name: Test
+  holdings:
+    - ticker: 123
+      label: US Large-Cap
+      target_weight: 0.6
+    - ticker: BND
+      label: Bonds
+      target_weight: 0.4
+rebalance:
+  schedule: 2nd_wednesday
+  min_days_between_rebalances: 7
+  drift:
+    mode: absolute
+    threshold: 0.075
+""".strip()
+    )
+
+    with pytest.raises(ValueError, match="Ticker must be a string"):
+        load_config(config_path)
+
+
+def test_load_positions_rejects_non_string_ticker(tmp_path: Path):
+    positions_path = tmp_path / "positions.yaml"
+    positions_path.write_text(
+        """
+positions:
+  - ticker: null
+    shares: 10
+""".strip()
+    )
+
+    with pytest.raises(ValueError, match="Ticker must be a string"):
+        load_positions(positions_path)

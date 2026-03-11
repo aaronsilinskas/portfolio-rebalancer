@@ -23,7 +23,10 @@ def _load_yaml_file(path: Path | str) -> dict:
 
 
 def _normalize_ticker(value: object) -> str:
-    ticker = str(value).strip().upper()
+    if not isinstance(value, str):
+        raise ValueError(f"Ticker must be a string, got {type(value).__name__}")
+
+    ticker = value.strip().upper()
     if not ticker:
         raise ValueError("Ticker cannot be empty")
     return ticker
