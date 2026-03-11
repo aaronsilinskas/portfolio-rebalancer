@@ -5,6 +5,10 @@ Commands
 --------
 rebalancer-simulate   Run a backtest over a historical date range.
 rebalancer-daily      Run the daily drift/schedule check and print any required trades.
+rebalancer-sync-positions  Align positions file with configured tickers.
+rebalancer-compare    Compare ticker performance over a date range.
+rebalancer-ramp-plan  Build a buy-only ramp contribution plan.
+rebalancer-ramp-backtest  Replay staged monthly ramp contributions.
 """
 
 from __future__ import annotations
@@ -18,6 +22,12 @@ from rebalancer.compare import write_comparison_outputs
 from rebalancer.config import dump_positions, load_config, load_positions
 from rebalancer.data import fetch_latest_prices, fetch_prices
 from rebalancer.portfolio import Portfolio
+from rebalancer.ramp import (
+    build_ramp_plan,
+    infer_ramp_stage,
+    parse_ramp_steps,
+    run_ramp_progression,
+)
 from rebalancer.rebalancer import compute_trades, project_shares_after_trades
 from rebalancer.report import write_csv, write_daily_check_files, write_html_report
 from rebalancer.simulator import is_second_wednesday, run_simulation
@@ -27,6 +37,8 @@ DEFAULT_CONFIG = Path(__file__).parent.parent.parent / "config" / "portfolio.yam
 DEFAULT_POSITIONS = Path(__file__).parent.parent.parent / "config" / "positions.yaml"
 DEFAULT_DAILY_OUTPUT = Path("output") / "daily"
 DEFAULT_COMPARE_OUTPUT = Path("output") / "comparisons"
+DEFAULT_RAMP_OUTPUT = Path("output") / "ramp-plans"
+DEFAULT_RAMP_BACKTEST_OUTPUT = Path("output") / "ramp-backtests"
 
 
 @click.command()
@@ -326,3 +338,194 @@ def compare_tickers(
     click.echo(f"  Prices CSV: {result.prices_csv}")
     click.echo(f"  Normalized CSV: {result.normalized_csv}")
     click.echo(f"  HTML report: {result.html_report}")
+
+
+@click.command()
+@click.option(
+    "--config",
+    type=click.Path(exists=True, path_type=Path),
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="Path to portfolio YAML config.",
+)
+@click.option(
+    "--positions",
+    type=click.Path(exists=True, path_type=Path),
+    default=DEFAULT_POSITIONS,
+    show_default=True,
+    help="Path to current positions YAML file.",
+)
+@click.option(
+    "--contribution",
+    type=float,
+    required=True,
+    help="Contribution amount in USD to allocate.",
+)
+@click.option(
+    "--stage",
+    type=click.Choice(["stage1", "stage2", "final"], case_sensitive=False),
+    help="Ramp stage to apply directly.",
+)
+@click.option(
+    "--funded-ratio",
+    type=float,
+    help="Current funded ratio in [0,1] used to infer stage (<=0.30 stage1, <=0.70 stage2, else final).",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_RAMP_OUTPUT,
+    show_default=True,
+    help="Directory to write ramp plan output files.",
+)
+def ramp_plan(
+    config: Path,
+    positions: Path,
+    contribution: float,
+    stage: str | None,
+    funded_ratio: float | None,
+    output: Path,
+) -> None:
+    """Build a buy-only contribution plan for ramping into target allocations."""
+    if contribution <= 0:
+        raise click.ClickException("Contribution must be positive.")
+    if stage and funded_ratio is not None:
+        raise click.ClickException("Use either --stage or --funded-ratio, not both.")
+
+    selected_stage: str
+    if funded_ratio is not None:
+        try:
+            selected_stage = infer_ramp_stage(funded_ratio)
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+    elif stage is not None:
+        selected_stage = stage.lower()
+    else:
+        selected_stage = "stage1"
+
+    cfg = load_config(config)
+    shares_by_ticker = load_positions(positions, allowed_tickers=set(cfg.tickers()))
+    prices = fetch_latest_prices(cfg.tickers())
+
+    plan = build_ramp_plan(
+        config=cfg,
+        shares_by_ticker=shares_by_ticker,
+        prices=prices,
+        contribution=contribution,
+        stage=selected_stage,
+    )
+
+    output_dir = output / f"{date.today().isoformat()}-{selected_stage}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plan_path = output_dir / "ramp_plan.csv"
+    plan.to_csv(plan_path, index=False)
+
+    click.echo(
+        f"Ramp plan ({selected_stage}) for ${contribution:,.2f} written to {plan_path}"
+    )
+    click.echo("Suggested buys:")
+    buys = plan[plan["buy_value"] > 0]
+    for _, row in buys.iterrows():
+        click.echo(
+            f"  {row['ticker']}: ${row['buy_value']:,.2f} ({row['buy_shares']:.6f} shares)"
+        )
+
+
+@click.command()
+@click.option(
+    "--config",
+    type=click.Path(exists=True, path_type=Path),
+    default=DEFAULT_CONFIG,
+    show_default=True,
+    help="Path to portfolio YAML config.",
+)
+@click.option(
+    "--positions",
+    type=click.Path(exists=True, path_type=Path),
+    default=DEFAULT_POSITIONS,
+    show_default=True,
+    help="Path to current positions YAML file.",
+)
+@click.option(
+    "--step",
+    "steps",
+    multiple=True,
+    required=True,
+    help="Funding step in format YYYY-MM:stage:amount (e.g., 2026-01:stage1:10000).",
+)
+@click.option(
+    "--valuation-date",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=date.today().isoformat(),
+    show_default=True,
+    help="Date to value the portfolio (YYYY-MM-DD).",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    default=DEFAULT_RAMP_BACKTEST_OUTPUT,
+    show_default=True,
+    help="Directory to write ramp backtest output files.",
+)
+def ramp_backtest(
+    config: Path,
+    positions: Path,
+    steps: tuple[str, ...],
+    valuation_date,
+    output: Path,
+) -> None:
+    """Backtest staged monthly contributions using ramp stages."""
+    try:
+        parsed_steps = parse_ramp_steps(list(steps))
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    cfg = load_config(config)
+    shares_by_ticker = load_positions(positions, allowed_tickers=set(cfg.tickers()))
+
+    first_step = parsed_steps[0]
+    start_date = date(first_step.year, first_step.month, 1)
+    end_date = valuation_date.date()
+    if end_date < start_date:
+        raise click.ClickException(
+            "--valuation-date must be on or after the first step month"
+        )
+
+    prices = fetch_prices(cfg.tickers(), start=start_date, end=end_date)
+
+    progression, final_shares, total_contributed, final_value, valuation_day = (
+        run_ramp_progression(
+            config=cfg,
+            steps=parsed_steps,
+            prices=prices,
+            initial_shares=shares_by_ticker,
+        )
+    )
+
+    total_return_pct = ((final_value / total_contributed) - 1.0) * 100.0
+
+    output_dir = output / f"{valuation_day.isoformat()}-ramp-backtest"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    progression_path = output_dir / "progression.csv"
+    final_positions_path = output_dir / "positions_after.yaml"
+    summary_path = output_dir / "summary.txt"
+
+    progression.to_csv(progression_path, index=False)
+    dump_positions(final_positions_path, final_shares)
+    summary_path.write_text(
+        "\n".join(
+            [
+                "Ramp Backtest Summary",
+                f"Valuation date: {valuation_day.isoformat()}",
+                f"Total contributed: ${total_contributed:,.2f}",
+                f"Final value: ${final_value:,.2f}",
+                f"Total return: {total_return_pct:.4f}%",
+            ]
+        )
+        + "\n"
+    )
+
+    click.echo(f"Ramp backtest written to {output_dir}/")
+    click.echo(f"Total contributed: ${total_contributed:,.2f}")
+    click.echo(f"Final value: ${final_value:,.2f}")
+    click.echo(f"Total return: {total_return_pct:.4f}%")

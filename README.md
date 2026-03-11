@@ -83,3 +83,54 @@ Outputs are written under `output/comparisons/<category>-<start>-to-<end>/`:
 - `prices.csv` with raw adjusted close prices
 - `normalized_prices.csv` with each series normalized to 100 at its first date
 - `comparison.html` with an interactive normalized performance chart
+
+## Ramp-Up Planner
+
+Use the ramp planner to generate a buy-only contribution plan while you build positions.
+
+It reads your current `config/positions.yaml`, fetches latest prices, applies a ramp stage,
+and writes `ramp_plan.csv` with suggested dollar buys and shares per ticker.
+
+Example (explicit stage):
+
+```bash
+uv run rebalancer-ramp-plan \
+  --contribution 5000 \
+  --stage stage1
+```
+
+Example (stage inferred from funded ratio):
+
+```bash
+uv run rebalancer-ramp-plan \
+  --contribution 5000 \
+  --funded-ratio 0.35
+```
+
+Stage rules:
+
+- `stage1`: funded ratio `<= 0.30`
+- `stage2`: funded ratio `<= 0.70`
+- `final`: funded ratio `> 0.70` (uses your configured final target weights)
+
+Outputs are written under `output/ramp-plans/YYYY-MM-DD-<stage>/ramp_plan.csv`.
+
+## Ramp Stage Backtest
+
+Use this command to replay staged monthly contributions over historical prices.
+
+Example (Jan `stage1`, Feb `stage2`, Mar `final`):
+
+```bash
+uv run rebalancer-ramp-backtest \
+  --step 2026-01:stage1:10000 \
+  --step 2026-02:stage2:10000 \
+  --step 2026-03:final:10000 \
+  --valuation-date 2026-03-10
+```
+
+Outputs are written under `output/ramp-backtests/YYYY-MM-DD-ramp-backtest/`:
+
+- `progression.csv` with one row per contribution step
+- `positions_after.yaml` with projected shares after all contributions
+- `summary.txt` with total contributed, final value, and total return

@@ -4,7 +4,13 @@ from pathlib import Path
 import pandas as pd
 from click.testing import CliRunner
 
-from rebalancer.cli import compare_tickers, daily_check, sync_positions
+from rebalancer.cli import (
+    compare_tickers,
+    daily_check,
+    ramp_backtest,
+    ramp_plan,
+    sync_positions,
+)
 from rebalancer.config import load_positions
 
 
@@ -255,3 +261,122 @@ def test_compare_tickers_writes_outputs(tmp_path: Path, monkeypatch):
     assert (expected_dir / "prices.csv").exists()
     assert (expected_dir / "normalized_prices.csv").exists()
     assert (expected_dir / "comparison.html").exists()
+
+
+def test_ramp_plan_writes_output_for_selected_stage(tmp_path: Path, monkeypatch):
+    config_path = tmp_path / "portfolio.yaml"
+    positions_path = tmp_path / "positions.yaml"
+    output_dir = tmp_path / "ramp-output"
+
+    _write_config(config_path)
+    _write_positions(positions_path, spy_shares=50.0, bnd_shares=50.0)
+
+    monkeypatch.setattr(
+        "rebalancer.cli.fetch_latest_prices",
+        lambda tickers: {"SPY": 100.0, "BND": 100.0},
+    )
+    monkeypatch.setattr("rebalancer.cli.date", FixedDate)
+
+    result = CliRunner().invoke(
+        ramp_plan,
+        [
+            "--config",
+            str(config_path),
+            "--positions",
+            str(positions_path),
+            "--contribution",
+            "1000",
+            "--stage",
+            "final",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    expected_csv = output_dir / "2024-01-10-final" / "ramp_plan.csv"
+
+    assert result.exit_code == 0
+    assert expected_csv.exists()
+    assert "Ramp plan (final)" in result.output
+
+
+def test_ramp_plan_inferrs_stage_from_funded_ratio(tmp_path: Path, monkeypatch):
+    config_path = tmp_path / "portfolio.yaml"
+    positions_path = tmp_path / "positions.yaml"
+    output_dir = tmp_path / "ramp-output"
+
+    _write_config(config_path)
+    _write_positions(positions_path, spy_shares=50.0, bnd_shares=50.0)
+
+    monkeypatch.setattr(
+        "rebalancer.cli.fetch_latest_prices",
+        lambda tickers: {"SPY": 100.0, "BND": 100.0},
+    )
+    monkeypatch.setattr("rebalancer.cli.date", FixedDate)
+
+    result = CliRunner().invoke(
+        ramp_plan,
+        [
+            "--config",
+            str(config_path),
+            "--positions",
+            str(positions_path),
+            "--contribution",
+            "1000",
+            "--funded-ratio",
+            "0.2",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    expected_csv = output_dir / "2024-01-10-stage1" / "ramp_plan.csv"
+
+    assert result.exit_code == 0
+    assert expected_csv.exists()
+    assert "Ramp plan (stage1)" in result.output
+
+
+def test_ramp_backtest_writes_progression_positions_and_summary(
+    tmp_path: Path, monkeypatch
+):
+    config_path = tmp_path / "portfolio.yaml"
+    positions_path = tmp_path / "positions.yaml"
+    output_dir = tmp_path / "ramp-backtests"
+
+    _write_config(config_path)
+    _write_positions(positions_path, spy_shares=0.0, bnd_shares=0.0)
+
+    prices = pd.DataFrame(
+        {
+            "SPY": [100.0, 102.0, 103.0],
+            "BND": [100.0, 101.0, 102.0],
+        },
+        index=pd.to_datetime(["2026-01-02", "2026-02-03", "2026-03-10"]),
+    )
+    monkeypatch.setattr("rebalancer.cli.fetch_prices", lambda *args, **kwargs: prices)
+
+    result = CliRunner().invoke(
+        ramp_backtest,
+        [
+            "--config",
+            str(config_path),
+            "--positions",
+            str(positions_path),
+            "--step",
+            "2026-01:stage1:10000",
+            "--step",
+            "2026-02:stage2:10000",
+            "--valuation-date",
+            "2026-03-10",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    expected_dir = output_dir / "2026-03-10-ramp-backtest"
+    assert result.exit_code == 0
+    assert (expected_dir / "progression.csv").exists()
+    assert (expected_dir / "positions_after.yaml").exists()
+    assert (expected_dir / "summary.txt").exists()
+    assert "Total contributed: $20,000.00" in result.output
