@@ -1,0 +1,78 @@
+"""Simulation CSV and HTML report writers."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+from rebalancer.report.frames import build_snapshots_df, build_trades_df
+from rebalancer.simulator import DailySnapshot
+
+
+def write_csv(snapshots: list[DailySnapshot], output_dir: Path) -> None:
+    """Write portfolio snapshots and trade log to CSV files."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    build_snapshots_df(snapshots).to_csv(output_dir / "snapshots.csv")
+    build_trades_df(snapshots).to_csv(output_dir / "trades.csv", index=False)
+
+
+def write_html_report(snapshots: list[DailySnapshot], output_dir: Path) -> None:
+    """Write a self-contained HTML report with interactive Plotly charts."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    snap_df = build_snapshots_df(snapshots)
+
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        subplot_titles=("Portfolio Value Over Time", "Holding Weights Over Time"),
+        vertical_spacing=0.12,
+    )
+
+    rebalance_dates = snap_df[snap_df["rebalanced"]].index
+    fig.add_trace(
+        go.Scatter(
+            x=snap_df.index,
+            y=snap_df["total_value"],
+            name="Portfolio Value",
+            line={"color": "steelblue"},
+        ),
+        row=1,
+        col=1,
+    )
+    for rebalance_date in rebalance_dates:
+        fig.add_vline(
+            x=str(rebalance_date),
+            line_width=1,
+            line_dash="dot",
+            line_color="orange",
+            row=1,  # type: ignore[call-arg]
+            col=1,  # type: ignore[call-arg]
+        )
+
+    weight_cols = [col for col in snap_df.columns if col.startswith("weight_")]
+    for col in weight_cols:
+        ticker = col.removeprefix("weight_")
+        fig.add_trace(
+            go.Scatter(
+                x=snap_df.index,
+                y=snap_df[col],
+                name=ticker,
+                stackgroup="weights",
+            ),
+            row=2,
+            col=1,
+        )
+
+    fig.update_layout(
+        title="Rebalancer Backtest Report",
+        height=800,
+        legend={"orientation": "h", "y": -0.15},
+    )
+    fig.update_yaxes(title_text="USD", row=1, col=1)
+    fig.update_yaxes(title_text="Weight", tickformat=".0%", row=2, col=1)
+
+    html_path = output_dir / "report.html"
+    fig.write_html(str(html_path), include_plotlyjs="cdn")

@@ -4,14 +4,10 @@ from pathlib import Path
 import pandas as pd
 from click.testing import CliRunner
 
-from rebalancer.cli import (
-    compare_tickers,
-    daily_check,
-    main,
-    ramp_backtest,
-    ramp_plan,
-    sync_positions,
-)
+from rebalancer.cli import main
+from rebalancer.cli_ramp import ramp_backtest, ramp_plan
+from rebalancer.cli_rebalance import daily_check, sync_positions
+from rebalancer.cli_simulator import compare_tickers
 from rebalancer.config import load_positions
 
 

@@ -1,4 +1,4 @@
-"""Top-level CLI wiring for grouped and legacy commands."""
+"""Top-level grouped CLI wiring."""
 
 from __future__ import annotations
 
@@ -43,12 +43,4 @@ main.add_command(ramp_group)
 main.add_command(simulator_group)
 
 
-__all__ = [
-    "compare_tickers",
-    "daily_check",
-    "main",
-    "ramp_backtest",
-    "ramp_plan",
-    "simulate",
-    "sync_positions",
-]
+__all__ = ["main"]
