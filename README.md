@@ -1,79 +1,51 @@
 # Rebalancing Stock Trader
 
-This project will automatically rebalance funds across a set of stock indexes, where each index will have a target percentage of the total fund. It should be able to look at past stock data to report on what would've happened each month and if any stock drifts would've triggered rebalancing. Ideally, it would take a total fund amount and a date range to simulate, and then report on the total fund amount at the end date.
+Toolkit for designing, testing, and operating a diversified 10-slot ETF portfolio with manual trade execution.
 
-## High Level Notes
+Primary purpose: generate monthly stock rebalancing recommendations so the portfolio stays aligned to target weights over time.
 
-- Python scripts, run daily within an hour of market open on a local always-on machine
-- **Scheduled rebalance:** 2nd Wednesday of each month
-- **Drift rebalance:** configurable threshold (absolute or relative), defaulting to +/- 7.5% absolute from target weight
-- Scheduled and drift rebalances merge into a single trade event; no more than one rebalance trade per week to reduce noise
-- When rebalancing, stocks above target weight are sold to fund purchases of stocks below target weight until all are restored to targets
-- **Tax considerations:** standard taxable account — no wash-sale or tax-lot optimization is built in initially, but trades should be logged clearly for manual review
-- Balance across 10 configurable slots in a portfolio. Tickers and target weights are fully configurable. Default starting weights are 10% each. First-pass defaults:
+This repository is organized around a practical lifecycle that supports monthly rebalancing operations:
 
-  | #   | Category                  | Default Ticker | Description                                     |
-  | --- | ------------------------- | -------------- | ----------------------------------------------- |
-  | 1   | US Large-Cap Equities     | VOO            | S&P 500 — core US market exposure               |
-  | 2   | US Small/Mid-Cap Equities | VO             | US mid-cap equities — growth-oriented exposure  |
-  | 3   | Developed ex-US Equities  | VEA            | FTSE Developed Markets — Europe, Japan, etc.    |
-  | 4   | Emerging Markets Equities | IEMG           | Broad emerging markets equity exposure          |
-  | 5   | Global Real Estate        | REET           | Global REITs — property/income diversification  |
-  | 6   | Precious Metals/Gold      | GLD            | Gold — inflation hedge, low stock correlation   |
-  | 7   | Broad Commodities         | BCI            | Broad commodity exposure across key sectors     |
-  | 8   | Energy/Resources          | IXC            | Global energy producers and integrated majors   |
-  | 9   | Bonds/Fixed Income        | VGIT           | Intermediate US Treasuries — defensive ballast  |
-  | 10  | Cash/Short-Term           | USFR           | Floating-rate Treasury notes — liquidity buffer |
+1. Compare candidate tickers for each portfolio slot.
+2. Backtest the full target allocation over a historical window.
+3. Ramp into the portfolio with staged contributions.
+4. Run daily checks and manually apply recommendations.
 
-## Data & Execution
+## Core Assumptions
 
-- **Price data:** Yahoo Finance (via `yfinance`)
-- **Live trading:** manual execution — the system generates trade instructions but does not place orders automatically until confidence is high enough to automate via broker API
-- **Daily checks:** use a local positions file with current fractional share counts so drift is measured against actual holdings, not a synthetic portfolio
-- **Manual workflow:** the daily command writes dated output files with a summary, current holdings snapshot, trade instructions, and a projected `positions_after.yaml` file when rebalancing is needed
+- Price data source: Yahoo Finance (via `yfinance`)
+- Trading model: recommendations only (no broker order placement)
+- Rebalance schedule: second Wednesday monthly
+- Drift trigger: configurable absolute or relative threshold
+- Minimum spacing: at most one rebalance event every 7 days by default
+- Fractional shares supported for planning, simulation, and daily recommendations
 
-## Backtesting / Simulation
+## Default Portfolio (`config/portfolio.yaml`)
 
-- Accepts a total fund amount and a date range
-- Simulates monthly snapshots, drift checks, and rebalance events
-- Does not model transaction costs or commissions
-- Fractional shares are used throughout (both simulation and trade output); no rounding to whole shares
-- **Output:** CSV of trades and portfolio state over time, plus an HTML report with charts
+| #   | Category                  | Default Ticker | Description                       |
+| --- | ------------------------- | -------------- | --------------------------------- |
+| 1   | US Large-Cap Equities     | VOO            | S&P 500 core exposure             |
+| 2   | US Small/Mid-Cap Equities | VO             | US mid-cap growth tilt            |
+| 3   | Developed ex-US Equities  | VEA            | Developed international markets   |
+| 4   | Emerging Markets Equities | IEMG           | Broad emerging markets exposure   |
+| 5   | Global Real Estate        | REET           | Global REIT exposure              |
+| 6   | Precious Metals/Gold      | GLD            | Gold as diversifier               |
+| 7   | Broad Commodities         | BCI            | Diversified commodities exposure  |
+| 8   | Energy/Resources          | IXC            | Global energy producers           |
+| 9   | Bonds/Fixed Income        | VGIT           | Intermediate US Treasury exposure |
+| 10  | Cash/Short-Term           | USFR           | Floating-rate Treasury notes      |
 
-## Configuration
+## CLI Surface
 
-Key parameters that should be configurable per portfolio:
+Primary grouped command:
 
-- Tickers (one per slot, swappable — e.g., SPY vs VOO)
-- Target weights per ticker
-- Current share counts for each ticker in a separate positions file used by the daily check
-- Drift threshold value
-- Drift threshold mode: `absolute` (percentage points) or `relative` (percentage of target weight)
-- Rebalance schedule (default: 2nd Wednesday monthly)
-- Minimum days between rebalance events (default: 7)
-
-## Manual Daily Workflow
-
-Primary CLI command uses grouped subcommands:
-
-- `uv run rebalancer rebalance ...`
-- `uv run rebalancer ramp ...`
 - `uv run rebalancer simulator ...`
+- `uv run rebalancer ramp ...`
+- `uv run rebalancer rebalance ...`
 
-Existing single-purpose commands (for example `rebalancer-ramp-plan`) still work as shortcuts.
+## Phase 1: Ticker Comparison
 
-1. After any ticker changes, run `uv run rebalancer rebalance sync-positions` to align `config/positions.yaml` with your portfolio config while preserving existing shares.
-2. Keep [config/positions.yaml](/Users/AaronH/dev/finance/rebalancer/config/positions.yaml) updated manually as you establish positions.
-3. Run `uv run rebalancer rebalance daily`.
-4. Review the dated folder under `output/daily/YYYY-MM-DD/`.
-5. If trades are required, execute them manually and then update `config/positions.yaml` to match the projected `positions_after.yaml` output.
-6. If positions are still zero while you are designing the portfolio, the daily command will skip rebalancing cleanly and still write a summary file.
-
-## Ticker Comparison
-
-Use the comparison command to evaluate multiple candidate tickers in the same category over a date range.
-
-Example:
+Use this first whenever you are deciding between alternatives for a category.
 
 ```bash
 uv run rebalancer simulator compare \
@@ -85,21 +57,63 @@ uv run rebalancer simulator compare \
   --end 2024-12-31
 ```
 
-Outputs are written under `output/comparisons/<category>-<start>-to-<end>/`:
+Output folder pattern:
 
-- `summary.csv` with return and risk metrics per ticker
-- `prices.csv` with raw adjusted close prices
-- `normalized_prices.csv` with each series normalized to 100 at its first date
-- `comparison.html` with an interactive normalized performance chart
+- `output/comparisons/<category>-<start>-to-<end>/summary.csv`
+- `output/comparisons/<category>-<start>-to-<end>/prices.csv`
+- `output/comparisons/<category>-<start>-to-<end>/normalized_prices.csv`
+- `output/comparisons/<category>-<start>-to-<end>/comparison.html`
 
-## Ramp-Up Planner
+When you pick winners, update `config/portfolio.yaml` and sync positions:
 
-Use the ramp planner to generate a buy-only contribution plan while you build positions.
+```bash
+uv run rebalancer rebalance sync-positions
+```
 
-It reads your current `config/positions.yaml`, fetches latest prices, applies a ramp stage,
-and writes `ramp_plan.csv` with suggested dollar buys and shares per ticker.
+## Phase 2: Portfolio Backtest Simulation
 
-Example (explicit stage):
+After selecting tickers and target weights, validate behavior over time with a full simulation.
+
+```bash
+uv run rebalancer simulator run \
+  --start 2021-01-01 \
+  --end 2025-12-31 \
+  --cash 100000
+```
+
+Review these outputs:
+
+- `output/snapshots.csv` for time-series portfolio state
+- `output/trades.csv` for rebalance trade events
+- `output/report.html` for cumulative portfolio behavior
+
+Use this phase to answer:
+
+- How often rebalances trigger under current drift settings
+- How portfolio value evolves under your chosen mix
+- Whether threshold/schedule settings look operationally realistic
+
+## Phase 3: Ramp-Up to Target Allocation
+
+Use ramp tools while funding the portfolio in stages.
+
+Backtest a staged funding plan first:
+
+```bash
+uv run rebalancer ramp backtest \
+  --step 2026-01:stage1:10000 \
+  --step 2026-02:stage2:10000 \
+  --step 2026-03:final:10000 \
+  --valuation-date 2026-03-10
+```
+
+Output folder pattern:
+
+- `output/ramp-backtests/YYYY-MM-DD-ramp-backtest/progression.csv`
+- `output/ramp-backtests/YYYY-MM-DD-ramp-backtest/positions_after.yaml`
+- `output/ramp-backtests/YYYY-MM-DD-ramp-backtest/summary.txt`
+
+On contribution day, generate a buy plan:
 
 ```bash
 uv run rebalancer ramp plan \
@@ -107,7 +121,7 @@ uv run rebalancer ramp plan \
   --stage stage1
 ```
 
-Example (stage inferred from funded ratio):
+Or infer stage from funded ratio:
 
 ```bash
 uv run rebalancer ramp plan \
@@ -119,26 +133,53 @@ Stage rules:
 
 - `stage1`: funded ratio `<= 0.30`
 - `stage2`: funded ratio `<= 0.70`
-- `final`: funded ratio `> 0.70` (uses your configured final target weights)
+- `final`: funded ratio `> 0.70`
 
-Outputs are written under `output/ramp-plans/YYYY-MM-DD-<stage>/ramp_plan.csv`.
+Ramp output folder pattern:
 
-## Ramp Stage Backtest
+- `output/ramp-plans/YYYY-MM-DD-<stage>/ramp_plan.csv`
 
-Use this command to replay staged monthly contributions over historical prices.
+## Phase 4: Daily Operations and Rebalancing
 
-Example (Jan `stage1`, Feb `stage2`, Mar `final`):
+Once funded, run the daily check near market open.
 
 ```bash
-uv run rebalancer ramp backtest \
-  --step 2026-01:stage1:10000 \
-  --step 2026-02:stage2:10000 \
-  --step 2026-03:final:10000 \
-  --valuation-date 2026-03-10
+uv run rebalancer rebalance daily
 ```
 
-Outputs are written under `output/ramp-backtests/YYYY-MM-DD-ramp-backtest/`:
+Daily output folder pattern:
 
-- `progression.csv` with one row per contribution step
-- `positions_after.yaml` with projected shares after all contributions
-- `summary.txt` with total contributed, final value, and total return
+- `output/daily/YYYY-MM-DD/summary.txt`
+- `output/daily/YYYY-MM-DD/holdings.csv`
+- `output/daily/YYYY-MM-DD/trades.csv` (when action is required)
+- `output/daily/YYYY-MM-DD/positions_current.yaml`
+- `output/daily/YYYY-MM-DD/positions_after.yaml` (when action is required)
+
+Daily statuses you should expect:
+
+- No action needed
+- Trigger detected but already at target
+- Rebalance required (trades listed)
+- Skipped because positions are unfunded
+
+## Manual Recommendation Application Checklist
+
+Use this checklist after every ramp plan or daily rebalance recommendation.
+
+1. Run the relevant command and open the dated output folder.
+2. Review `summary.txt` and `trades.csv` for ticker, action, shares, and dollar amounts.
+3. Place orders manually in your broker.
+4. Confirm actual fills and adjust for any partial fills.
+5. Update `config/positions.yaml` to match actual post-trade shares.
+6. Re-run the same command to confirm the recommendation now resolves cleanly.
+
+## Key Configuration Files
+
+- `config/portfolio.yaml`: holdings, labels, target weights, schedule, and drift settings
+- `config/positions.yaml`: current shares used for live drift and rebalance calculations
+
+## Practical Notes
+
+- No transaction costs, slippage, taxes, or lot-level optimization are modeled.
+- Recommendations are decision support; execution remains manual.
+- Keep outputs for auditability and strategy review.

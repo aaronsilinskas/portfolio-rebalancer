@@ -14,12 +14,6 @@ dependencies = [
 
 [project.scripts]
 rebalancer = "rebalancer.cli:main"
-rebalancer-simulate = "rebalancer.cli_simulator:simulate"
-rebalancer-daily = "rebalancer.cli_rebalance:daily_check"
-rebalancer-sync-positions = "rebalancer.cli_rebalance:sync_positions"
-rebalancer-compare = "rebalancer.cli_simulator:compare_tickers"
-rebalancer-ramp-plan = "rebalancer.cli_ramp:ramp_plan"
-rebalancer-ramp-backtest = "rebalancer.cli_ramp:ramp_backtest"
 
 [build-system]
 requires = ["hatchling"]
