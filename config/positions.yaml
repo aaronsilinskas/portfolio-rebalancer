@@ -1,26 +1,21 @@
-# Current portfolio positions used by the daily check command.
-# Replace these placeholder share counts with your actual holdings.
-# Until you have real positions, leaving these at 0.0 is fine; the daily command
-# will skip rebalancing and write a summary file instead of failing.
-
 positions:
-  - ticker: SPY
-    shares: 0.0
-  - ticker: VB
-    shares: 0.0
-  - ticker: VEA
-    shares: 0.0
-  - ticker: VWO
-    shares: 0.0
-  - ticker: VNQ
-    shares: 0.0
-  - ticker: GLD
-    shares: 0.0
-  - ticker: DBC
-    shares: 0.0
-  - ticker: XLE
-    shares: 0.0
-  - ticker: BND
-    shares: 0.0
-  - ticker: BIL
-    shares: 0.0
+- ticker: VOO
+  shares: 0.0
+- ticker: VO
+  shares: 0.0
+- ticker: VEA
+  shares: 0.0
+- ticker: IEMG
+  shares: 0.0
+- ticker: REET
+  shares: 0.0
+- ticker: GLD
+  shares: 0.0
+- ticker: BCI
+  shares: 0.0
+- ticker: IXC
+  shares: 0.0
+- ticker: VGIT
+  shares: 0.0
+- ticker: USFR
+  shares: 0.0
