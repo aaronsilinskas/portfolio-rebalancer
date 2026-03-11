@@ -13,6 +13,9 @@ from plotly.subplots import make_subplots
 from rebalancer.simulator import DailySnapshot
 
 
+TRADE_COLUMNS = ["date", "ticker", "action", "shares", "price", "value"]
+
+
 def build_snapshots_df(snapshots: list[DailySnapshot]) -> pd.DataFrame:
     """Convert simulation snapshots into a flat DataFrame."""
     rows = []
@@ -38,7 +41,7 @@ def build_trades_df(snapshots: list[DailySnapshot]) -> pd.DataFrame:
                     "value": round(t.value, 2),
                 }
             )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=TRADE_COLUMNS)
 
 
 def write_csv(snapshots: list[DailySnapshot], output_dir: Path) -> None:

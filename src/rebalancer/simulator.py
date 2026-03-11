@@ -57,6 +57,15 @@ def run_simulation(
     list[DailySnapshot]
         One snapshot per trading day.
     """
+    if prices.empty:
+        raise ValueError("Price data must contain at least one row")
+
+    missing_columns = set(config.tickers()) - set(prices.columns)
+    if missing_columns:
+        raise ValueError(
+            f"Price data is missing columns for tickers: {sorted(missing_columns)}"
+        )
+
     snapshots: list[DailySnapshot] = []
     last_rebalance_date: date | None = None
     min_gap = timedelta(days=config.rebalance.min_days_between_rebalances)

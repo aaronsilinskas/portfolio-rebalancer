@@ -83,3 +83,22 @@ class Portfolio:
             shares = allocation / price
             holdings[h.ticker] = Holding(ticker=h.ticker, shares=shares, price=price)
         return cls(config=config, holdings=holdings)
+
+    @classmethod
+    def from_shares(
+        cls,
+        config: PortfolioConfig,
+        shares_by_ticker: dict[str, float],
+        prices: dict[str, float],
+    ) -> "Portfolio":
+        """Initialise a portfolio from current share counts and latest prices."""
+        holdings: dict[str, Holding] = {}
+        for holding_config in config.holdings:
+            price = prices[holding_config.ticker]
+            shares = shares_by_ticker.get(holding_config.ticker, 0.0)
+            holdings[holding_config.ticker] = Holding(
+                ticker=holding_config.ticker,
+                shares=shares,
+                price=price,
+            )
+        return cls(config=config, holdings=holdings)

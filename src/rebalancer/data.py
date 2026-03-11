@@ -4,10 +4,22 @@ data.py — Fetch historical and current price data from Yahoo Finance via yfina
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 import yfinance as yf
+
+
+def _extract_close_prices(raw: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
+    if raw.empty:
+        return pd.DataFrame(columns=tickers)
+
+    if isinstance(raw.columns, pd.MultiIndex):
+        prices = raw["Close"]
+    else:
+        prices = raw[["Close"]].rename(columns={"Close": tickers[0]})
+
+    return prices.dropna(how="all")
 
 
 def fetch_prices(
@@ -21,25 +33,29 @@ def fetch_prices(
     Returns a DataFrame with dates as the index and tickers as columns.
     Raises ValueError if any ticker returns no data.
     """
+    if end < start:
+        raise ValueError("End date must be on or after start date")
+
     raw = yf.download(
         tickers,
         start=start.isoformat(),
-        end=end.isoformat(),
+        end=(end + timedelta(days=1)).isoformat(),
         auto_adjust=True,
         progress=False,
     )
 
-    if isinstance(raw.columns, pd.MultiIndex):
-        prices = raw["Close"]
-    else:
-        # Single ticker — yfinance returns a flat DataFrame
-        prices = raw[["Close"]].rename(columns={"Close": tickers[0]})
+    prices = _extract_close_prices(raw, tickers)
 
     missing = [t for t in tickers if t not in prices.columns or prices[t].isna().all()]
     if missing:
         raise ValueError(f"No price data returned for tickers: {missing}")
 
-    return prices.dropna(how="all")
+    if prices.empty:
+        raise ValueError(
+            f"No price data returned for date range {start.isoformat()} to {end.isoformat()}"
+        )
+
+    return prices
 
 
 def fetch_latest_prices(tickers: list[str]) -> dict[str, float]:
@@ -50,11 +66,7 @@ def fetch_latest_prices(tickers: list[str]) -> dict[str, float]:
     Returns a dict mapping ticker -> price.
     """
     raw = yf.download(tickers, period="5d", auto_adjust=True, progress=False)
-    prices = (
-        raw["Close"]
-        if isinstance(raw.columns, pd.MultiIndex)
-        else raw[["Close"]].rename(columns={"Close": tickers[0]})
-    )
+    prices = _extract_close_prices(raw, tickers)
     missing = [t for t in tickers if t not in prices.columns or prices[t].isna().all()]
     if missing:
         raise ValueError(f"No price data returned for tickers: {missing}")

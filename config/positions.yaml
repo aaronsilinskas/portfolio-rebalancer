@@ -1,0 +1,24 @@
+# Current portfolio positions used by the daily check command.
+# Replace these placeholder share counts with your actual holdings.
+
+positions:
+  - ticker: SPY
+    shares: 0.0
+  - ticker: VB
+    shares: 0.0
+  - ticker: VEA
+    shares: 0.0
+  - ticker: VWO
+    shares: 0.0
+  - ticker: VNQ
+    shares: 0.0
+  - ticker: GLD
+    shares: 0.0
+  - ticker: DBC
+    shares: 0.0
+  - ticker: XLE
+    shares: 0.0
+  - ticker: BND
+    shares: 0.0
+  - ticker: BIL
+    shares: 0.0

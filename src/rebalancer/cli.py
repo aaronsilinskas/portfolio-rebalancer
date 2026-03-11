@@ -14,7 +14,7 @@ from pathlib import Path
 
 import click
 
-from rebalancer.config import load_config
+from rebalancer.config import load_config, load_positions
 from rebalancer.data import fetch_latest_prices, fetch_prices
 from rebalancer.portfolio import Portfolio
 from rebalancer.rebalancer import compute_trades
@@ -23,6 +23,7 @@ from rebalancer.simulator import is_second_wednesday, run_simulation
 
 
 DEFAULT_CONFIG = Path(__file__).parent.parent.parent / "config" / "portfolio.yaml"
+DEFAULT_POSITIONS = Path(__file__).parent.parent.parent / "config" / "positions.yaml"
 
 
 @click.command()
@@ -84,7 +85,14 @@ def simulate(config: Path, start, end, cash: float, output: Path) -> None:
     show_default=True,
     help="Path to portfolio YAML config.",
 )
-def daily_check(config: Path) -> None:
+@click.option(
+    "--positions",
+    type=click.Path(exists=True, path_type=Path),
+    default=DEFAULT_POSITIONS,
+    show_default=True,
+    help="Path to current positions YAML file.",
+)
+def daily_check(config: Path, positions: Path) -> None:
     """
     Run the daily drift and schedule check.
 
@@ -98,10 +106,12 @@ def daily_check(config: Path) -> None:
     click.echo(f"Fetching latest prices for {cfg.tickers()} ...")
     prices = fetch_latest_prices(cfg.tickers())
 
-    # NOTE: share counts are unknown without a live positions file.
-    # For now, this command checks drift based on a hypothetically equal-weighted
-    # portfolio at current prices (a placeholder until positions tracking is added).
-    portfolio = Portfolio.from_cash(cfg, total_cash=1_000_000.0, prices=prices)
+    shares_by_ticker = load_positions(positions, allowed_tickers=set(cfg.tickers()))
+    portfolio = Portfolio.from_shares(cfg, shares_by_ticker, prices)
+    if portfolio.total_value <= 0:
+        raise click.ClickException(
+            "Positions file must contain a positive total market value before daily checks can run."
+        )
 
     scheduled = is_second_wednesday(today)
     drifts = portfolio.drifts()

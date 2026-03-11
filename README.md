@@ -29,6 +29,7 @@ This project will automatically rebalance funds across a set of stock indexes, w
 
 - **Price data:** Yahoo Finance (via `yfinance`)
 - **Live trading:** manual execution — the system generates trade instructions but does not place orders automatically until confidence is high enough to automate via broker API
+- **Daily checks:** use a local positions file with current fractional share counts so drift is measured against actual holdings, not a synthetic portfolio
 
 ## Backtesting / Simulation
 
@@ -44,6 +45,7 @@ Key parameters that should be configurable per portfolio:
 
 - Tickers (one per slot, swappable — e.g., SPY vs VOO)
 - Target weights per ticker
+- Current share counts for each ticker in a separate positions file used by the daily check
 - Drift threshold value
 - Drift threshold mode: `absolute` (percentage points) or `relative` (percentage of target weight)
 - Rebalance schedule (default: 2nd Wednesday monthly)
