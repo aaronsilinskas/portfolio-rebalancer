@@ -12,8 +12,6 @@ wheels/
 
 # uv
 .venv/
-.python-version
-uv.lock
 
 # pytest / coverage
 .pytest_cache/
