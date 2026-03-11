@@ -80,3 +80,47 @@ def test_dump_positions_round_trips(tmp_path: Path):
     dump_positions(positions_path, positions)
 
     assert load_positions(positions_path) == positions
+
+
+def test_load_config_normalizes_tickers_to_uppercase(tmp_path: Path):
+    config_path = tmp_path / "portfolio.yaml"
+    config_path.write_text(
+        """
+portfolio:
+  name: Test
+  holdings:
+    - ticker: spy
+      label: US Large-Cap
+      target_weight: 0.6
+    - ticker:  bnd
+      label: Bonds
+      target_weight: 0.4
+rebalance:
+  schedule: 2nd_wednesday
+  min_days_between_rebalances: 7
+  drift:
+    mode: absolute
+    threshold: 0.075
+""".strip()
+    )
+
+    cfg = load_config(config_path)
+
+    assert cfg.tickers() == ["SPY", "BND"]
+
+
+def test_load_positions_normalizes_tickers_to_uppercase(tmp_path: Path):
+    positions_path = tmp_path / "positions.yaml"
+    positions_path.write_text(
+        """
+positions:
+  - ticker: spy
+    shares: 10
+  - ticker: bNd
+    shares: 5
+""".strip()
+    )
+
+    positions = load_positions(positions_path, allowed_tickers={"SPY", "BND"})
+
+    assert positions == {"SPY": 10.0, "BND": 5.0}

@@ -311,6 +311,50 @@ def test_simulate_writes_benchmark_outputs(tmp_path: Path, monkeypatch):
     assert (output_dir / "benchmark_values.csv").exists()
 
 
+def test_simulate_skips_benchmarks_when_flag_is_set(tmp_path: Path, monkeypatch):
+    config_path = tmp_path / "portfolio.yaml"
+    output_dir = tmp_path / "sim-output"
+
+    _write_config(config_path)
+
+    portfolio_prices = pd.DataFrame(
+        {
+            "SPY": [100.0, 101.0, 102.0],
+            "BND": [100.0, 100.5, 101.0],
+        },
+        index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
+    )
+
+    def fake_fetch_prices(tickers, start, end):
+        if tickers == ["SPY", "BND"]:
+            return portfolio_prices
+        raise AssertionError(f"Unexpected benchmark ticker fetch: {tickers}")
+
+    monkeypatch.setattr("rebalancer.cli_simulator.fetch_prices", fake_fetch_prices)
+
+    result = CliRunner().invoke(
+        simulate,
+        [
+            "--config",
+            str(config_path),
+            "--start",
+            "2024-01-02",
+            "--end",
+            "2024-01-04",
+            "--cash",
+            "10000",
+            "--no-benchmarks",
+            "--output",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Including benchmarks:" not in result.output
+    assert "Benchmark CSV:" not in result.output
+    assert not (output_dir / "benchmark_values.csv").exists()
+
+
 def test_ramp_plan_writes_output_for_selected_stage(tmp_path: Path, monkeypatch):
     config_path = tmp_path / "portfolio.yaml"
     positions_path = tmp_path / "positions.yaml"

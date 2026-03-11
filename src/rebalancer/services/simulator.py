@@ -21,7 +21,7 @@ class SimulationRunResult:
     rebalance_count: int
     final_value: float
     snapshots: list[DailySnapshot]
-    benchmark_tickers: list[str]
+    benchmark_tickers: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,9 @@ def run_historical_simulation(
     ) = None,
 ) -> SimulationRunResult:
     """Run historical simulation and persist report outputs."""
+    if end_date < start_date:
+        raise ValueError("End date must be on or after start date")
+
     cfg = load_config(config_path)
     prices = price_fetcher(cfg.tickers(), start_date, end_date)
 
@@ -73,7 +76,7 @@ def run_historical_simulation(
         final_value=final_value,
         snapshots=snapshots,
         benchmark_tickers=(
-            list(benchmark_values.columns) if benchmark_values is not None else []
+            tuple(benchmark_values.columns) if benchmark_values is not None else ()
         ),
     )
 
@@ -88,7 +91,8 @@ def _build_benchmark_values(
     if benchmark_prices.empty:
         return pd.DataFrame(index=snapshot_dates)
 
-    aligned = benchmark_prices.sort_index().reindex(snapshot_dates).ffill().bfill()
+    # Forward-fill only: avoids fabricating pre-inception history for benchmarks.
+    aligned = benchmark_prices.sort_index().reindex(snapshot_dates).ffill()
     if aligned.empty:
         return pd.DataFrame(index=snapshot_dates)
 
@@ -115,6 +119,9 @@ def run_ticker_comparison(
     price_fetcher: Callable[[list[str], date, date], pd.DataFrame],
 ) -> TickerComparisonResult:
     """Run ticker comparison and persist output artifacts."""
+    if end_date < start_date:
+        raise ValueError("End date must be on or after start date")
+
     unique_tickers = list(dict.fromkeys(t.upper() for t in tickers))
     if len(unique_tickers) < 2:
         raise ValueError("At least two unique tickers are required.")

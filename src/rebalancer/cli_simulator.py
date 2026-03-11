@@ -13,7 +13,6 @@ from rebalancer.cli_options import (
     with_output_option,
     with_start_date_option,
 )
-from rebalancer.config import load_config
 from rebalancer.market_data import fetch_prices
 from rebalancer.services.simulator import (
     run_historical_simulation,
@@ -55,8 +54,14 @@ def simulate(
     output: Path,
 ) -> None:
     """Run a backtest simulation over a historical date range."""
-    cfg = load_config(config)
-    click.echo(f"Fetching price data for {cfg.tickers()} ...")
+    click.echo("Fetching price data for configured portfolio tickers ...")
+
+    def historical_price_fetcher(tickers: list[str], start_date, end_date):
+        return fetch_prices(
+            tickers,
+            start=start_date,
+            end=end_date,
+        )
 
     selected_benchmarks: tuple[str, ...] = ()
     if not no_benchmarks:
@@ -75,17 +80,9 @@ def simulate(
         end_date=end.date(),
         cash=cash,
         output_dir=output,
-        price_fetcher=lambda tickers, start_date, end_date: fetch_prices(
-            tickers,
-            start=start_date,
-            end=end_date,
-        ),
+        price_fetcher=historical_price_fetcher,
         benchmark_tickers=selected_benchmarks,
-        benchmark_price_fetcher=lambda tickers, start_date, end_date: fetch_prices(
-            tickers,
-            start=start_date,
-            end=end_date,
-        ),
+        benchmark_price_fetcher=historical_price_fetcher,
     )
 
     click.echo(
@@ -128,9 +125,8 @@ def compare_tickers(
     """Compare a set of tickers over a date range."""
     start_date = start.date()
     end_date = end.date()
-    unique_tickers = list(dict.fromkeys(t.upper() for t in tickers))
     click.echo(
-        f"Comparing {len(unique_tickers)} tickers in '{category}' from {start_date} to {end_date} ..."
+        f"Comparing {len(tickers)} tickers in '{category}' from {start_date} to {end_date} ..."
     )
 
     try:

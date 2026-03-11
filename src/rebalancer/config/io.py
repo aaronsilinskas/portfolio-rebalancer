@@ -22,6 +22,13 @@ def _load_yaml_file(path: Path | str) -> dict:
     return raw
 
 
+def _normalize_ticker(value: object) -> str:
+    ticker = str(value).strip().upper()
+    if not ticker:
+        raise ValueError("Ticker cannot be empty")
+    return ticker
+
+
 def load_config(path: Path | str) -> PortfolioConfig:
     """Load and validate a portfolio configuration from a YAML file."""
     raw = _load_yaml_file(path)
@@ -40,7 +47,7 @@ def load_config(path: Path | str) -> PortfolioConfig:
     holdings: list[HoldingConfig] = []
     seen_tickers: set[str] = set()
     for holding_raw in holdings_raw:
-        ticker = holding_raw["ticker"]
+        ticker = _normalize_ticker(holding_raw["ticker"])
         if ticker in seen_tickers:
             raise ValueError(f"Duplicate ticker in portfolio config: {ticker}")
 
@@ -113,15 +120,24 @@ def load_positions(
     if not positions_raw:
         raise ValueError("Positions file must define at least one position")
 
+    normalized_allowed_tickers = (
+        {_normalize_ticker(ticker) for ticker in allowed_tickers}
+        if allowed_tickers is not None
+        else None
+    )
+
     positions: dict[str, float] = {}
     for position_raw in positions_raw:
-        ticker = position_raw["ticker"]
+        ticker = _normalize_ticker(position_raw["ticker"])
         shares = float(position_raw["shares"])
         if shares < 0:
             raise ValueError(f"Position shares for {ticker} must be non-negative")
         if ticker in positions:
             raise ValueError(f"Duplicate ticker in positions file: {ticker}")
-        if allowed_tickers is not None and ticker not in allowed_tickers:
+        if (
+            normalized_allowed_tickers is not None
+            and ticker not in normalized_allowed_tickers
+        ):
             raise ValueError(f"Ticker {ticker} is not defined in the portfolio config")
         positions[ticker] = shares
 

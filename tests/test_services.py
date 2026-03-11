@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from rebalancer.config import load_positions
 from rebalancer.services.ramp import create_ramp_backtest, create_ramp_plan
@@ -238,11 +239,56 @@ def test_run_historical_simulation_returns_summary_and_writes_files(tmp_path: Pa
 
     assert result.rebalance_count >= 0
     assert result.final_value > 0
-    assert result.benchmark_tickers == ["^GSPC", "^IXIC"]
+    assert result.benchmark_tickers == ("^GSPC", "^IXIC")
     assert (output_dir / "snapshots.csv").exists()
     assert (output_dir / "trades.csv").exists()
     assert (output_dir / "benchmark_values.csv").exists()
     assert (output_dir / "report.html").exists()
+
+
+def test_run_historical_simulation_does_not_backfill_pre_inception_benchmarks(
+    tmp_path: Path,
+):
+    config_path = tmp_path / "portfolio.yaml"
+    output_dir = tmp_path / "sim-output"
+
+    _write_config(config_path)
+
+    prices = pd.DataFrame(
+        {
+            "SPY": [100.0, 101.0],
+            "BND": [100.0, 100.5],
+        },
+        index=pd.to_datetime(["2024-01-02", "2024-01-03"]),
+    )
+    # Benchmark starts after the first snapshot date; it should not be backfilled.
+    late_benchmark = pd.DataFrame(
+        {
+            "^GSPC": [4810.0],
+        },
+        index=pd.to_datetime(["2024-01-03"]),
+    )
+
+    def fake_fetch_prices(tickers, start, end):
+        if tickers == ["SPY", "BND"]:
+            return prices
+        if tickers == ["^GSPC"]:
+            return late_benchmark
+        raise AssertionError(f"Unexpected ticker list: {tickers}")
+
+    result = run_historical_simulation(
+        config_path=config_path,
+        start_date=date(2024, 1, 2),
+        end_date=date(2024, 1, 3),
+        cash=10_000.0,
+        output_dir=output_dir,
+        price_fetcher=fake_fetch_prices,
+        benchmark_tickers=("^GSPC",),
+        benchmark_price_fetcher=fake_fetch_prices,
+    )
+
+    assert result.benchmark_tickers == ()
+    assert not (output_dir / "benchmark_values.csv").exists()
 
 
 def test_run_ticker_comparison_returns_output_and_writes_files(tmp_path: Path):
@@ -270,3 +316,30 @@ def test_run_ticker_comparison_returns_output_and_writes_files(tmp_path: Path):
     assert result.output.prices_csv.exists()
     assert result.output.normalized_csv.exists()
     assert result.output.html_report.exists()
+
+
+def test_run_historical_simulation_rejects_end_before_start(tmp_path: Path):
+    config_path = tmp_path / "portfolio.yaml"
+    _write_config(config_path)
+
+    with pytest.raises(ValueError, match="End date must be on or after start date"):
+        run_historical_simulation(
+            config_path=config_path,
+            start_date=date(2024, 1, 3),
+            end_date=date(2024, 1, 2),
+            cash=10_000.0,
+            output_dir=tmp_path / "sim-output",
+            price_fetcher=lambda tickers, start, end: pd.DataFrame(),
+        )
+
+
+def test_run_ticker_comparison_rejects_end_before_start(tmp_path: Path):
+    with pytest.raises(ValueError, match="End date must be on or after start date"):
+        run_ticker_comparison(
+            category="US Large Cap",
+            tickers=("SPY", "VOO"),
+            start_date=date(2024, 1, 3),
+            end_date=date(2024, 1, 2),
+            output_root=tmp_path / "comparisons",
+            price_fetcher=lambda tickers, start, end: pd.DataFrame(),
+        )

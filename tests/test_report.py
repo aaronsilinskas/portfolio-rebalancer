@@ -7,6 +7,7 @@ from rebalancer.report import (
     build_holdings_df,
     build_trades_df,
     write_daily_check_files,
+    write_csv,
     write_html_report,
 )
 from rebalancer.simulator import DailySnapshot
@@ -82,3 +83,22 @@ def test_write_html_report_includes_rebalance_event_marker(tmp_path: Path):
 
     html = (tmp_path / "report.html").read_text()
     assert "Rebalance Event" in html
+
+
+def test_write_csv_removes_stale_benchmark_file(tmp_path: Path):
+    snapshots = [
+        DailySnapshot(
+            date=date(2024, 1, 10),
+            total_value=10_000.0,
+            weights={"SPY": 0.6, "BND": 0.4},
+            rebalanced=False,
+            trades=[],
+        )
+    ]
+
+    stale_benchmark_csv = tmp_path / "benchmark_values.csv"
+    stale_benchmark_csv.write_text("old,data\n")
+
+    write_csv(snapshots, tmp_path, benchmark_values=None)
+
+    assert not stale_benchmark_csv.exists()

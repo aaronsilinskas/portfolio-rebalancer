@@ -21,8 +21,11 @@ def write_csv(
     output_dir.mkdir(parents=True, exist_ok=True)
     build_snapshots_df(snapshots).to_csv(output_dir / "snapshots.csv")
     build_trades_df(snapshots).to_csv(output_dir / "trades.csv", index=False)
+    benchmark_csv = output_dir / "benchmark_values.csv"
     if benchmark_values is not None and not benchmark_values.empty:
-        benchmark_values.to_csv(output_dir / "benchmark_values.csv")
+        benchmark_values.to_csv(benchmark_csv)
+    elif benchmark_csv.exists():
+        benchmark_csv.unlink()
 
 
 def write_html_report(
