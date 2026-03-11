@@ -1,54 +1,18 @@
-"""
-config.py — Load and validate the portfolio configuration from a YAML file.
-"""
+"""Load and validate portfolio and positions YAML files."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 import yaml
 
-
-DriftMode = Literal["absolute", "relative"]
-RebalanceSchedule = Literal["2nd_wednesday"]
-
-VALID_DRIFT_MODES = {"absolute", "relative"}
-VALID_SCHEDULES = {"2nd_wednesday"}
-
-
-@dataclass
-class HoldingConfig:
-    ticker: str
-    label: str
-    target_weight: float
-
-
-@dataclass
-class DriftConfig:
-    mode: DriftMode
-    threshold: float
-
-
-@dataclass
-class RebalanceConfig:
-    schedule: RebalanceSchedule
-    min_days_between_rebalances: int
-    drift: DriftConfig
-
-
-@dataclass
-class PortfolioConfig:
-    name: str
-    holdings: list[HoldingConfig]
-    rebalance: RebalanceConfig
-
-    def tickers(self) -> list[str]:
-        return [h.ticker for h in self.holdings]
-
-    def target_weights(self) -> dict[str, float]:
-        return {h.ticker: h.target_weight for h in self.holdings}
+from rebalancer.config.models import (
+    DriftConfig,
+    HoldingConfig,
+    PortfolioConfig,
+    RebalanceConfig,
+)
+from rebalancer.config.validation import VALID_DRIFT_MODES, VALID_SCHEDULES
 
 
 def _load_yaml_file(path: Path | str) -> dict:
