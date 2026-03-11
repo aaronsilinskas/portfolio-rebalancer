@@ -13,7 +13,7 @@ from rebalancer.portfolio import Portfolio
 @dataclass
 class Trade:
     ticker: str
-    action: str  # "BUY" or "SELL"
+    action: Literal["BUY", "SELL"]
     shares: float  # positive number
     price: float
     value: float  # shares * price

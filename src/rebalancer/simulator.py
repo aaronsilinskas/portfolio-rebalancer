@@ -62,18 +62,12 @@ def run_simulation(
     min_gap = timedelta(days=config.rebalance.min_days_between_rebalances)
 
     # Initialise portfolio on the first available day
-    first_prices = {
-        ticker: float(prices.loc[prices.index[0], ticker])
-        for ticker in config.tickers()
-    }
+    first_prices = {col: float(val) for col, val in prices.iloc[0].items()}
     portfolio = Portfolio.from_cash(config, initial_cash, first_prices)
 
-    for ts in prices.index:
+    for ts, row in prices.iterrows():
         today = ts.date()
-        day_prices = {
-            ticker: float(prices.loc[ts, ticker]) for ticker in config.tickers()
-        }
-        portfolio.update_prices(day_prices)
+        portfolio.update_prices({col: float(val) for col, val in row.items()})
 
         # Determine whether to rebalance today
         rebalanced = False

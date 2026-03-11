@@ -104,7 +104,10 @@ def daily_check(config: Path) -> None:
     portfolio = Portfolio.from_cash(cfg, total_cash=1_000_000.0, prices=prices)
 
     scheduled = is_second_wednesday(today)
-    drift_breach = portfolio.has_drift_breach()
+    drifts = portfolio.drifts()
+    threshold = cfg.rebalance.drift.threshold
+    breaches = {t: d for t, d in drifts.items() if abs(d) > threshold}
+    drift_breach = bool(breaches)
 
     if not scheduled and not drift_breach:
         click.echo("No rebalancing needed today.")
@@ -114,10 +117,6 @@ def daily_check(config: Path) -> None:
     if scheduled:
         reason.append("scheduled (2nd Wednesday)")
     if drift_breach:
-        drifts = portfolio.drifts()
-        breaches = {
-            t: d for t, d in drifts.items() if abs(d) > cfg.rebalance.drift.threshold
-        }
         reason.append(f"drift breach: {breaches}")
 
     click.echo(f"Rebalance triggered: {', '.join(reason)}")
