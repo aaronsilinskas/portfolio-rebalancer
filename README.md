@@ -1,4 +1,4 @@
-# Rebalancing Stock Trader
+# Portfolio Rebalancer
 
 Toolkit for designing, testing, and operating a diversified 10-slot ETF portfolio with manual trade execution.
 

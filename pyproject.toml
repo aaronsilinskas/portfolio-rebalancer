@@ -1,7 +1,7 @@
 [project]
-name = "rebalancer"
+name = "portfolio-rebalancer"
 version = "0.1.0"
-description = "Automated portfolio rebalancer with backtesting and reporting"
+description = "Portfolio Rebalancer for monthly diversified portfolio management"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

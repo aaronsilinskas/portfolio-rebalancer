@@ -11,7 +11,7 @@ from rebalancer.cli_simulator import compare_tickers, simulate
 
 @click.group()
 def main() -> None:
-    """Portfolio rebalancer command suite."""
+    """Portfolio Rebalancer command suite."""
 
 
 @click.group(name="rebalance")

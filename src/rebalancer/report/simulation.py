@@ -67,7 +67,7 @@ def write_html_report(snapshots: list[DailySnapshot], output_dir: Path) -> None:
         )
 
     fig.update_layout(
-        title="Rebalancer Backtest Report",
+        title="Portfolio Rebalancer Backtest Report",
         height=800,
         legend={"orientation": "h", "y": -0.15},
     )
