@@ -54,9 +54,17 @@ Key parameters that should be configurable per portfolio:
 
 ## Manual Daily Workflow
 
-1. After any ticker changes, run `uv run rebalancer-sync-positions` to align `config/positions.yaml` with your portfolio config while preserving existing shares.
+Primary CLI command uses grouped subcommands:
+
+- `uv run rebalancer rebalance ...`
+- `uv run rebalancer ramp ...`
+- `uv run rebalancer simulator ...`
+
+Existing single-purpose commands (for example `rebalancer-ramp-plan`) still work as shortcuts.
+
+1. After any ticker changes, run `uv run rebalancer rebalance sync-positions` to align `config/positions.yaml` with your portfolio config while preserving existing shares.
 2. Keep [config/positions.yaml](/Users/AaronH/dev/finance/rebalancer/config/positions.yaml) updated manually as you establish positions.
-3. Run `uv run rebalancer-daily`.
+3. Run `uv run rebalancer rebalance daily`.
 4. Review the dated folder under `output/daily/YYYY-MM-DD/`.
 5. If trades are required, execute them manually and then update `config/positions.yaml` to match the projected `positions_after.yaml` output.
 6. If positions are still zero while you are designing the portfolio, the daily command will skip rebalancing cleanly and still write a summary file.
@@ -68,7 +76,7 @@ Use the comparison command to evaluate multiple candidate tickers in the same ca
 Example:
 
 ```bash
-uv run rebalancer-compare \
+uv run rebalancer simulator compare \
   --category "US Large-Cap Equities" \
   --ticker SPY \
   --ticker VOO \
@@ -94,7 +102,7 @@ and writes `ramp_plan.csv` with suggested dollar buys and shares per ticker.
 Example (explicit stage):
 
 ```bash
-uv run rebalancer-ramp-plan \
+uv run rebalancer ramp plan \
   --contribution 5000 \
   --stage stage1
 ```
@@ -102,7 +110,7 @@ uv run rebalancer-ramp-plan \
 Example (stage inferred from funded ratio):
 
 ```bash
-uv run rebalancer-ramp-plan \
+uv run rebalancer ramp plan \
   --contribution 5000 \
   --funded-ratio 0.35
 ```
@@ -122,7 +130,7 @@ Use this command to replay staged monthly contributions over historical prices.
 Example (Jan `stage1`, Feb `stage2`, Mar `final`):
 
 ```bash
-uv run rebalancer-ramp-backtest \
+uv run rebalancer ramp backtest \
   --step 2026-01:stage1:10000 \
   --step 2026-02:stage2:10000 \
   --step 2026-03:final:10000 \

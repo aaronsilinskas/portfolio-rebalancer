@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import cast
 
 import pandas as pd
@@ -52,6 +53,15 @@ class RampStep:
         return f"{self.year:04d}-{self.month:02d}"
 
 
+@dataclass(frozen=True)
+class RampProgressionResult:
+    progression: pd.DataFrame
+    final_shares: dict[str, float]
+    total_contributed: float
+    final_value: float
+    valuation_date: date
+
+
 STEP_COLUMNS = [
     "stage",
     "month",
@@ -60,6 +70,26 @@ STEP_COLUMNS = [
     "buy_count",
     "portfolio_value_after_buy",
 ]
+
+
+def validate_contribution_amount(
+    amount: float | str,
+    *,
+    field_name: str = "contribution",
+) -> float:
+    """Validate a positive contribution amount with cent precision."""
+    try:
+        value = Decimal(str(amount))
+    except InvalidOperation as exc:
+        raise ValueError(f"{field_name} must be numeric") from exc
+
+    if value <= 0:
+        raise ValueError(f"{field_name} must be positive")
+
+    if value != value.quantize(Decimal("0.01")):
+        raise ValueError(f"{field_name} must not include sub-cent precision")
+
+    return float(value)
 
 
 def infer_ramp_stage(funded_ratio: float) -> str:
@@ -87,7 +117,8 @@ def parse_ramp_steps(step_specs: list[str] | tuple[str, ...]) -> list[RampStep]:
                 f"Invalid step '{spec}'. Expected format YYYY-MM:stage:amount"
             )
 
-        month_part, stage, amount_part = parts
+        month_part, stage_part, amount_part = parts
+        stage = stage_part.lower()
         if stage not in {"stage1", "stage2", "final"}:
             raise ValueError(
                 f"Invalid stage in '{spec}'. Stage must be one of stage1, stage2, final"
@@ -97,21 +128,19 @@ def parse_ramp_steps(step_specs: list[str] | tuple[str, ...]) -> list[RampStep]:
             year_s, month_s = month_part.split("-")
             year = int(year_s)
             month = int(month_s)
-        except Exception as exc:  # noqa: BLE001
+        except ValueError as exc:
             raise ValueError(f"Invalid month in '{spec}'. Expected YYYY-MM") from exc
 
         if month < 1 or month > 12:
             raise ValueError(f"Invalid month in '{spec}'. Month must be in 01..12")
 
         try:
-            contribution = float(amount_part)
+            contribution = validate_contribution_amount(
+                amount_part,
+                field_name=f"Contribution in '{spec}'",
+            )
         except ValueError as exc:
-            raise ValueError(
-                f"Invalid contribution in '{spec}'. Expected numeric amount"
-            ) from exc
-
-        if contribution <= 0:
-            raise ValueError(f"Contribution in '{spec}' must be positive")
+            raise ValueError(str(exc)) from exc
 
         parsed.append(
             RampStep(
@@ -173,10 +202,10 @@ def build_ramp_plan(
     prices: dict[str, float],
     contribution: float,
     stage: str,
+    round_values: bool = True,
 ) -> pd.DataFrame:
     """Build a buy-only allocation plan for a new contribution."""
-    if contribution <= 0:
-        raise ValueError("contribution must be positive")
+    contribution = validate_contribution_amount(contribution)
 
     target_weights = get_ramp_target_weights(config, stage)
 
@@ -207,6 +236,10 @@ def build_ramp_plan(
         }
 
     rows: list[dict[str, float | str]] = []
+
+    def _fmt(value: float, digits: int) -> float:
+        return round(value, digits) if round_values else float(value)
+
     for ticker in config.tickers():
         price = float(prices[ticker])
         current_shares = float(shares_by_ticker.get(ticker, 0.0))
@@ -220,17 +253,17 @@ def build_ramp_plan(
         rows.append(
             {
                 "ticker": ticker,
-                "price": round(price, 4),
-                "current_shares": round(current_shares, 6),
-                "current_value": round(current_values[ticker], 2),
-                "ramp_target_weight": round(target_weights[ticker], 6),
-                "target_value_after_contribution": round(target_values[ticker], 2),
-                "deficit_value": round(deficits[ticker], 2),
-                "buy_value": round(buy_value, 2),
-                "buy_shares": round(buy_shares, 6),
-                "post_shares": round(post_shares, 6),
-                "post_value": round(post_value, 2),
-                "post_weight": round(post_weight, 6),
+                "price": _fmt(price, 4),
+                "current_shares": _fmt(current_shares, 6),
+                "current_value": _fmt(current_values[ticker], 2),
+                "ramp_target_weight": _fmt(target_weights[ticker], 6),
+                "target_value_after_contribution": _fmt(target_values[ticker], 2),
+                "deficit_value": _fmt(deficits[ticker], 2),
+                "buy_value": _fmt(buy_value, 2),
+                "buy_shares": _fmt(buy_shares, 6),
+                "post_shares": _fmt(post_shares, 6),
+                "post_value": _fmt(post_value, 2),
+                "post_weight": _fmt(post_weight, 6),
             }
         )
 
@@ -244,7 +277,7 @@ def run_ramp_progression(
     steps: list[RampStep],
     prices: pd.DataFrame,
     initial_shares: dict[str, float],
-) -> tuple[pd.DataFrame, dict[str, float], float, float, date]:
+) -> RampProgressionResult:
     """Simulate staged monthly contributions and return progression summary."""
     if not steps:
         raise ValueError("At least one step is required")
@@ -276,6 +309,7 @@ def run_ramp_progression(
             prices=price_map,
             contribution=step.contribution,
             stage=step.stage,
+            round_values=False,
         )
 
         for _, plan_row in plan.iterrows():
@@ -305,11 +339,10 @@ def run_ramp_progression(
     }
     final_value = sum(shares[ticker] * valuation_prices[ticker] for ticker in tickers)
 
-    progression_df = pd.DataFrame(rows, columns=STEP_COLUMNS)
-    return (
-        progression_df,
-        shares,
-        round(total_contributed, 2),
-        round(final_value, 2),
-        valuation_ts.date(),
+    return RampProgressionResult(
+        progression=pd.DataFrame(rows, columns=STEP_COLUMNS),
+        final_shares=shares,
+        total_contributed=round(total_contributed, 2),
+        final_value=round(final_value, 2),
+        valuation_date=valuation_ts.date(),
     )

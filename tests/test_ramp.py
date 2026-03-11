@@ -62,12 +62,35 @@ def test_parse_ramp_steps_sorts_and_parses_valid_specs():
     assert steps[0].contribution == 5000.0
 
 
+def test_parse_ramp_steps_accepts_case_insensitive_stage_names():
+    steps = parse_ramp_steps(["2026-01:Stage1:5000", "2026-02:FINAL:5000"])
+
+    assert steps[0].stage == "stage1"
+    assert steps[1].stage == "final"
+
+
 def test_parse_ramp_steps_rejects_duplicate_months():
     try:
         parse_ramp_steps(["2026-01:stage1:5000", "2026-01:stage2:5000"])
         raise AssertionError("Expected ValueError for duplicate month")
     except ValueError as exc:
         assert "Duplicate month" in str(exc)
+
+
+def test_parse_ramp_steps_rejects_sub_cent_contributions():
+    try:
+        parse_ramp_steps(["2026-01:stage1:1000.001"])
+        raise AssertionError("Expected ValueError for sub-cent contribution")
+    except ValueError as exc:
+        assert "sub-cent" in str(exc)
+
+
+def test_parse_ramp_steps_requires_at_least_one_step():
+    try:
+        parse_ramp_steps([])
+        raise AssertionError("Expected ValueError for empty steps")
+    except ValueError as exc:
+        assert "At least one step" in str(exc)
 
 
 def test_run_ramp_progression_returns_expected_summary_shape():
@@ -82,15 +105,15 @@ def test_run_ramp_progression_returns_expected_summary_shape():
         index=pd.to_datetime(["2026-01-02", "2026-02-02", "2026-03-02"]),
     )
 
-    progression, shares, contributed, final_value, valuation_day = run_ramp_progression(
+    result = run_ramp_progression(
         config=config,
         steps=steps,
         prices=prices,
         initial_shares={"SPY": 0.0, "BND": 0.0},
     )
 
-    assert list(progression["month"]) == ["2026-01", "2026-02"]
-    assert contributed == 2000.0
-    assert final_value > 0.0
-    assert valuation_day.isoformat() == "2026-03-02"
-    assert set(shares) == {"SPY", "BND"}
+    assert list(result.progression["month"]) == ["2026-01", "2026-02"]
+    assert result.total_contributed == 2000.0
+    assert result.final_value > 0.0
+    assert result.valuation_date.isoformat() == "2026-03-02"
+    assert set(result.final_shares) == {"SPY", "BND"}

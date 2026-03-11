@@ -7,6 +7,7 @@ from click.testing import CliRunner
 from rebalancer.cli import (
     compare_tickers,
     daily_check,
+    main,
     ramp_backtest,
     ramp_plan,
     sync_positions,
@@ -337,6 +338,31 @@ def test_ramp_plan_inferrs_stage_from_funded_ratio(tmp_path: Path, monkeypatch):
     assert "Ramp plan (stage1)" in result.output
 
 
+def test_ramp_plan_rejects_sub_cent_contribution(tmp_path: Path):
+    config_path = tmp_path / "portfolio.yaml"
+    positions_path = tmp_path / "positions.yaml"
+
+    _write_config(config_path)
+    _write_positions(positions_path, spy_shares=0.0, bnd_shares=0.0)
+
+    result = CliRunner().invoke(
+        ramp_plan,
+        [
+            "--config",
+            str(config_path),
+            "--positions",
+            str(positions_path),
+            "--contribution",
+            "1000.001",
+            "--stage",
+            "stage1",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "sub-cent" in result.output
+
+
 def test_ramp_backtest_writes_progression_positions_and_summary(
     tmp_path: Path, monkeypatch
 ):
@@ -380,3 +406,37 @@ def test_ramp_backtest_writes_progression_positions_and_summary(
     assert (expected_dir / "positions_after.yaml").exists()
     assert (expected_dir / "summary.txt").exists()
     assert "Total contributed: $20,000.00" in result.output
+
+
+def test_ramp_backtest_rejects_valuation_date_before_first_step_month(tmp_path: Path):
+    config_path = tmp_path / "portfolio.yaml"
+    positions_path = tmp_path / "positions.yaml"
+
+    _write_config(config_path)
+    _write_positions(positions_path, spy_shares=0.0, bnd_shares=0.0)
+
+    result = CliRunner().invoke(
+        ramp_backtest,
+        [
+            "--config",
+            str(config_path),
+            "--positions",
+            str(positions_path),
+            "--step",
+            "2026-02:stage1:10000",
+            "--valuation-date",
+            "2026-01-31",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--valuation-date must be on or after the first step month" in result.output
+
+
+def test_main_group_exposes_expected_subcommand_categories():
+    result = CliRunner().invoke(main, ["--help"])
+
+    assert result.exit_code == 0
+    assert "rebalance" in result.output
+    assert "ramp" in result.output
+    assert "simulator" in result.output

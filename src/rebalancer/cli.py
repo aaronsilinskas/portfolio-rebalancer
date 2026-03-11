@@ -27,6 +27,7 @@ from rebalancer.ramp import (
     infer_ramp_stage,
     parse_ramp_steps,
     run_ramp_progression,
+    validate_contribution_amount,
 )
 from rebalancer.rebalancer import compute_trades, project_shares_after_trades
 from rebalancer.report import write_csv, write_daily_check_files, write_html_report
@@ -387,8 +388,14 @@ def ramp_plan(
     output: Path,
 ) -> None:
     """Build a buy-only contribution plan for ramping into target allocations."""
-    if contribution <= 0:
-        raise click.ClickException("Contribution must be positive.")
+    try:
+        contribution = validate_contribution_amount(
+            contribution,
+            field_name="Contribution",
+        )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
     if stage and funded_ratio is not None:
         raise click.ClickException("Use either --stage or --funded-ratio, not both.")
 
@@ -493,32 +500,35 @@ def ramp_backtest(
 
     prices = fetch_prices(cfg.tickers(), start=start_date, end=end_date)
 
-    progression, final_shares, total_contributed, final_value, valuation_day = (
-        run_ramp_progression(
-            config=cfg,
-            steps=parsed_steps,
-            prices=prices,
-            initial_shares=shares_by_ticker,
-        )
+    result = run_ramp_progression(
+        config=cfg,
+        steps=parsed_steps,
+        prices=prices,
+        initial_shares=shares_by_ticker,
     )
 
-    total_return_pct = ((final_value / total_contributed) - 1.0) * 100.0
+    if result.total_contributed <= 0:
+        raise click.ClickException(
+            "Total contributed value is zero; unable to compute return"
+        )
 
-    output_dir = output / f"{valuation_day.isoformat()}-ramp-backtest"
+    total_return_pct = ((result.final_value / result.total_contributed) - 1.0) * 100.0
+
+    output_dir = output / f"{result.valuation_date.isoformat()}-ramp-backtest"
     output_dir.mkdir(parents=True, exist_ok=True)
     progression_path = output_dir / "progression.csv"
     final_positions_path = output_dir / "positions_after.yaml"
     summary_path = output_dir / "summary.txt"
 
-    progression.to_csv(progression_path, index=False)
-    dump_positions(final_positions_path, final_shares)
+    result.progression.to_csv(progression_path, index=False)
+    dump_positions(final_positions_path, result.final_shares)
     summary_path.write_text(
         "\n".join(
             [
                 "Ramp Backtest Summary",
-                f"Valuation date: {valuation_day.isoformat()}",
-                f"Total contributed: ${total_contributed:,.2f}",
-                f"Final value: ${final_value:,.2f}",
+                f"Valuation date: {result.valuation_date.isoformat()}",
+                f"Total contributed: ${result.total_contributed:,.2f}",
+                f"Final value: ${result.final_value:,.2f}",
                 f"Total return: {total_return_pct:.4f}%",
             ]
         )
@@ -526,6 +536,40 @@ def ramp_backtest(
     )
 
     click.echo(f"Ramp backtest written to {output_dir}/")
-    click.echo(f"Total contributed: ${total_contributed:,.2f}")
-    click.echo(f"Final value: ${final_value:,.2f}")
+    click.echo(f"Total contributed: ${result.total_contributed:,.2f}")
+    click.echo(f"Final value: ${result.final_value:,.2f}")
     click.echo(f"Total return: {total_return_pct:.4f}%")
+
+
+@click.group()
+def main() -> None:
+    """Portfolio rebalancer command suite."""
+
+
+@click.group(name="rebalance")
+def rebalance_group() -> None:
+    """Live/manual rebalancing workflows."""
+
+
+@click.group(name="ramp")
+def ramp_group() -> None:
+    """Ramp-up planning and staged backtests."""
+
+
+@click.group(name="simulator")
+def simulator_group() -> None:
+    """Historical simulation and comparison tools."""
+
+
+rebalance_group.add_command(daily_check, name="daily")
+rebalance_group.add_command(sync_positions, name="sync-positions")
+
+ramp_group.add_command(ramp_plan, name="plan")
+ramp_group.add_command(ramp_backtest, name="backtest")
+
+simulator_group.add_command(simulate, name="run")
+simulator_group.add_command(compare_tickers, name="compare")
+
+main.add_command(rebalance_group)
+main.add_command(ramp_group)
+main.add_command(simulator_group)
